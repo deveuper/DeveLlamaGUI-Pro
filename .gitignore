@@ -1,0 +1,25 @@
+# Build
+/target/
+debug/
+*.exe
+*.pdb
+*.exp
+*.lib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Config (user-specific)
+config.json
+
+# Workbuddy
+.workbuddy/

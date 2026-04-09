@@ -1,0 +1,19 @@
+[package]
+name = "DeveLlamaGUI-Pro"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+egui = "0.28"
+eframe = { version = "0.28", features = ["default"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rfd = "0.14"
+dirs = "5.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
