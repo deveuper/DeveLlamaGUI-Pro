@@ -120,8 +120,8 @@ MIT License — feel free to use, modify, and distribute.
 
 | | DeveLlamaGUI Pro | LM Studio | llama.cpp CLI |
 |---|---|---|---|
-| **大小** | ~3 MB | ~2 GB+ | ~50 MB |
-| **内存** | ~100 MB | ~1 GB+ | ~50 MB |
+| **容量** | ~3 MB | ~2 GB+ | ~50 MB |
+| **内存占用** | ~100 MB | ~1 GB+ | ~50 MB |
 | **图形界面** | ✅ 原生 | ✅ Electron | ❌ 仅命令行 |
 | **运行时调参** | ✅ | ❌ | ❌ |
 | **预设管理** | ✅ | ✅ | ❌ |
@@ -152,6 +152,15 @@ MIT License — feel free to use, modify, and distribute.
 
 **DeveLlamaGUI Pro** 採用了不同的方式：
 
+| | DeveLlamaGUI Pro | LM Studio | llama.cpp CLI |
+|---|---|---|---|
+| **Size** | ~3 MB | ~2 GB+ | ~50 MB |
+| **Memory** | ~100 MB | ~1 GB+ | ~50 MB |
+| **GUI** | ✅ Native | ✅ Electron | ❌ CLI only |
+| **Runtime tuning** | ✅ | ❌ | ❌ |
+| **Preset management** | ✅ | ✅ | ❌ |
+| **Uses your llama.cpp** | ✅ | ❌ (bundled) | ✅ |
+
 ### 核心功能
 
 - 🚀 **啟動和管理** llama-server，不再輸入命令
@@ -176,6 +185,15 @@ MIT License — feel free to use, modify, and distribute.
 LM StudioなどのサードパーティGUIは独自のエンジンを同梱しており、**巨大なダウンロード（数GB）**と**高いメモリ使用量（1GB+）**をもたらします。
 
 **DeveLlamaGUI Pro**は別のアプローチを取ります：
+
+| | DeveLlamaGUI Pro | LM Studio | llama.cpp CLI |
+|---|---|---|---|
+| **Size** | ~3 MB | ~2 GB+ | ~50 MB |
+| **Memory** | ~100 MB | ~1 GB+ | ~50 MB |
+| **GUI** | ✅ Native | ✅ Electron | ❌ CLI only |
+| **Runtime tuning** | ✅ | ❌ | ❌ |
+| **Preset management** | ✅ | ✅ | ❌ |
+| **Uses your llama.cpp** | ✅ | ❌ (bundled) | ✅ |
 
 ### 主な機能
 
