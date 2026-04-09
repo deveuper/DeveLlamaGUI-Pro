@@ -7,8 +7,11 @@
 [![Size](https://img.shields.io/badge/size-~3MB-orange.svg)](#)
 
 <p align="center">
-  <img src="screenshot_v3.png" width="700" alt="DeveLlamaGUI Pro Screenshot">
+  <img src="screenshot_cyberpunk.png" width="480" alt="Cyberpunk Theme">
+  <img src="screenshot_sakura_pink.png" width="480" alt="Sakura Pink Theme">
 </p>
+
+<p align="center"><em>Cyberpunk (default) & Sakura Pink themes</em></p>
 
 ## 🌐 Languages / 语言
 
