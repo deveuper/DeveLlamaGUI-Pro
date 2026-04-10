@@ -180,6 +180,8 @@ fn t(lang: Language, key: &str) -> String {
             "theme" => "Theme".to_string(),
             "api_url" => "API URL".to_string(),
             "will_apply_next" => "Runtime params will be applied on next API call".to_string(),
+            "launch_need_restart" => "Launch params require restart to take effect".to_string(),
+            "runtime_per_request" => "Runtime params apply per API request".to_string(),
             _ => key.to_string(),
         },
         Language::ChineseSimplified => match key {
@@ -263,7 +265,9 @@ fn t(lang: Language, key: &str) -> String {
             "unknown_cmd" => "未知命令:".to_string(),
             "theme" => "主题".to_string(),
             "api_url" => "API地址".to_string(),
-            "will_apply_next" => "运行时参数将在下次API调用时应用".to_string(),
+            "will_apply_next" => "运行时参数将在每次API请求时应用".to_string(),
+            "launch_need_restart" => "启动参数需重启服务后生效".to_string(),
+            "runtime_per_request" => "运行时参数在每次API请求时传入".to_string(),
             _ => key.to_string(),
         },
         Language::ChineseTraditional => match key {
@@ -347,7 +351,9 @@ fn t(lang: Language, key: &str) -> String {
             "unknown_cmd" => "未知命令:".to_string(),
             "theme" => "主題".to_string(),
             "api_url" => "API位址".to_string(),
-            "will_apply_next" => "執行時參數將在下次API呼叫時套用".to_string(),
+            "will_apply_next" => "執行時參數將在每次API請求時套用".to_string(),
+            "launch_need_restart" => "啟動參數需重啟服務後生效".to_string(),
+            "runtime_per_request" => "執行時參數在每次API請求時傳入".to_string(),
             _ => key.to_string(),
         },
         Language::Japanese => match key {
@@ -431,7 +437,9 @@ fn t(lang: Language, key: &str) -> String {
             "unknown_cmd" => "不明なコマンド:".to_string(),
             "theme" => "テーマ".to_string(),
             "api_url" => "API URL".to_string(),
-            "will_apply_next" => "実行時パラメータは次のAPI呼び出し時に適用されます".to_string(),
+            "will_apply_next" => "実行時パラメータは各APIリクエスト時に適用されます".to_string(),
+            "launch_need_restart" => "起動パラメータは再起動後に有効になります".to_string(),
+            "runtime_per_request" => "実行時パラメータは各APIリクエストで渡されます".to_string(),
             _ => key.to_string(),
         },
         Language::Korean => match key {
@@ -515,7 +523,9 @@ fn t(lang: Language, key: &str) -> String {
             "unknown_cmd" => "알 수 없는 명령어:".to_string(),
             "theme" => "테마".to_string(),
             "api_url" => "API URL".to_string(),
-            "will_apply_next" => "런타임 매개변수는 다음 API 호출 시 적용됩니다".to_string(),
+            "will_apply_next" => "런타임 매개변수는 각 API 요청 시 적용됩니다".to_string(),
+            "launch_need_restart" => "시작 매개변수는 재시작 후 적용됩니다".to_string(),
+            "runtime_per_request" => "런타임 매개변수는 각 API 요청에 전달됩니다".to_string(),
             _ => key.to_string(),
         },
     }
@@ -833,6 +843,7 @@ struct DeveLlamaGUI {
     quick_commands: Vec<QuickCommand>,
     show_all_commands: bool,
     config_file_path: PathBuf,
+    launch_config_dirty: bool, // 启动参数在运行期间被修改，需要重启
 }
 
 impl DeveLlamaGUI {
@@ -919,6 +930,7 @@ impl DeveLlamaGUI {
             quick_commands,
             show_all_commands: false,
             config_file_path,
+            launch_config_dirty: false,
         };
         gui.update_command_preview();
         gui
@@ -1059,6 +1071,7 @@ impl DeveLlamaGUI {
         if !config.continuous_batching { cmd.push_str(" ^\n  --no-cont-batching"); }
         if config.n_parallel > 1 { cmd.push_str(&format!(" ^\n  --parallel {}", config.n_parallel)); }
         if !config.mmproj_path.is_empty() { cmd.push_str(&format!(" ^\n  --mmproj \"{}\"", config.mmproj_path)); }
+        cmd.push_str(" ^\n  --props");
         cmd
     }
 
@@ -1099,6 +1112,8 @@ impl DeveLlamaGUI {
         if !config.continuous_batching { cmd.arg("--no-cont-batching"); }
         if config.n_parallel > 1 { cmd.arg("--parallel").arg(config.n_parallel.to_string()); }
         if !config.mmproj_path.is_empty() { cmd.arg("--mmproj").arg(&config.mmproj_path); }
+        // 启用props API端点，允许通过GET /props查看运行时属性
+        cmd.arg("--props");
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -1126,6 +1141,7 @@ impl DeveLlamaGUI {
                 
                 *self.server_process.lock().unwrap() = Some(child);
                 self.is_running = true;
+                self.launch_config_dirty = false;
                 self.status_message = format!("Running on port {}", config.port);
                 self.logs.push(t(lang, "server_started").to_string());
                 self.logs.push(format!("API: {}", self.api_url));
@@ -1145,6 +1161,7 @@ impl DeveLlamaGUI {
         }
         let lang = self.settings.language;
         self.is_running = false;
+        self.launch_config_dirty = false;
         self.status_message = t(lang, "status_stopped").to_string();
         self.logs.push(t(lang, "server_stopped").to_string());
         self.params_apply_status.clear();
@@ -1153,9 +1170,51 @@ impl DeveLlamaGUI {
     fn apply_runtime_params(&mut self) {
         let lang = self.settings.language;
         self.params_modified = false;
-        self.params_apply_status = t(lang, "params_saved").to_string();
-        self.logs.push(t(lang, "runtime_params_updated").to_string());
         self.save_config();
+        
+        // llama-server的运行时参数（temperature等）不能全局修改，
+        // 它们是在每次/completion或/v1/chat/completions请求时传入的。
+        // 但我们可以通过GET /props验证服务器是否在运行，并读取当前默认值
+        if self.is_running {
+            let url = format!("http://{}:{}/props", self.launch_config.host, self.launch_config.port);
+            let mut cmd = Command::new("curl");
+            cmd.args(["-s", &url]);
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            
+            match cmd.output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        self.params_apply_status = t(lang, "runtime_params_updated").to_string();
+                        self.logs.push(format!("[API] Server props: {}", stdout.trim()));
+                        self.logs.push("[INFO] Note: Runtime params (temp, top_k, etc.) are applied per-request via /completion or /v1/chat/completions API.".to_string());
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        self.params_apply_status = format!("API Error: {}", stderr.trim());
+                        self.logs.push(format!("[API] Error: {}", stderr.trim()));
+                    }
+                }
+                Err(e) => {
+                    self.params_apply_status = format!("Failed: {}", e);
+                    self.logs.push(format!("[API] curl failed: {}", e));
+                }
+            }
+        } else {
+            self.params_apply_status = t(lang, "params_saved").to_string();
+            self.logs.push(t(lang, "params_saved").to_string());
+        }
+    }
+
+    fn on_launch_param_changed(&mut self) {
+        self.update_command_preview();
+        self.save_config();
+        if self.is_running {
+            self.launch_config_dirty = true;
+        }
     }
 
     fn on_runtime_param_changed(&mut self) {
@@ -1275,6 +1334,13 @@ impl eframe::App for DeveLlamaGUI {
                     (t(lang, "status_stopped"), error)
                 };
                 ui.label(egui::RichText::new(status_text).size(14.0).color(status_color));
+                
+                // 如果运行中且启动参数被修改，显示警告
+                if self.is_running && self.launch_config_dirty {
+                    ui.separator();
+                    ui.label(egui::RichText::new(format!("⚠ {}", t(lang, "launch_need_restart"))).size(13.0).color(egui::Color32::YELLOW));
+                }
+                
                 ui.separator();
                 ui.monospace(&self.api_url);
                 
@@ -1424,20 +1490,29 @@ impl eframe::App for DeveLlamaGUI {
                                 .show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "model"));
-                                        ui.add(egui::TextEdit::singleline(&mut self.launch_config.model_path)
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.model_path)
                                             .desired_width(ui.available_width() - 70.0));
+                                        if resp.changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                         if ui.button(t(lang, "browse")).clicked() { self.open_model_dialog(); }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "server"));
-                                        ui.add(egui::TextEdit::singleline(&mut self.launch_config.llama_server_path)
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.llama_server_path)
                                             .desired_width(ui.available_width() - 70.0));
+                                        if resp.changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                         if ui.button(t(lang, "browse")).clicked() { self.open_exe_dialog(); }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "mmproj"));
-                                        ui.add(egui::TextEdit::singleline(&mut self.launch_config.mmproj_path)
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.mmproj_path)
                                             .desired_width(ui.available_width() - 110.0));
+                                        if resp.changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                         if ui.button(t(lang, "browse")).clicked() { self.open_mmproj_dialog(); }
                                         if ui.button(t(lang, "clear")).clicked() {
                                             self.launch_config.mmproj_path.clear();
@@ -1452,9 +1527,12 @@ impl eframe::App for DeveLlamaGUI {
                                 .show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "host"));
-                                        ui.add(egui::TextEdit::singleline(&mut self.launch_config.host).desired_width(ui.available_width() - 140.0));
+                                        let host_resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.host).desired_width(ui.available_width() - 140.0));
                                         ui.label(t(lang, "port"));
-                                        ui.add(egui::DragValue::new(&mut self.launch_config.port).speed(1).range(1024..=65535));
+                                        let port_resp = ui.add(egui::DragValue::new(&mut self.launch_config.port).speed(1).range(1024..=65535));
+                                        if host_resp.changed() || port_resp.changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                 });
 
@@ -1465,29 +1543,39 @@ impl eframe::App for DeveLlamaGUI {
                                         ui.label(t(lang, "gpu_layers"));
                                         let sw = ui.available_width() - 50.0;
                                         if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.n_gpu_layers, 0..=999)).changed() {
-                                            self.save_config();
+                                            self.on_launch_param_changed();
                                         }
-                                        if ui.button(t(lang, "max")).clicked() { self.launch_config.n_gpu_layers = 999; }
+                                        if ui.button(t(lang, "max")).clicked() { 
+                                            self.launch_config.n_gpu_layers = 999; 
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "ctx_size"));
                                         let sw = ui.available_width();
-                                        ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.ctx_size, 512..=131072).logarithmic(true));
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.ctx_size, 512..=131072).logarithmic(true)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "parallel_slots"));
                                         let sw = ui.available_width();
-                                        ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.n_parallel, 1..=16));
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.n_parallel, 1..=16)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "kv_cache"));
-                                        egui::ComboBox::from_id_source("kv_cache").width(ui.available_width())
+                                        let kv_changed = egui::ComboBox::from_id_source("kv_cache").width(ui.available_width())
                                             .selected_text(&self.launch_config.kv_cache_type)
                                             .show_ui(ui, |ui| {
                                                 for t in &["f16", "f32", "q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "bf16", "iq4_nl"] {
                                                     ui.selectable_value(&mut self.launch_config.kv_cache_type, t.to_string(), *t);
                                                 }
-                                            });
+                                            }).inner.is_some();
+                                        if kv_changed {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                 });
                         });
@@ -1513,32 +1601,48 @@ impl eframe::App for DeveLlamaGUI {
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "threads"));
                                         let sw = ui.available_width();
-                                        ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.threads, 1..=32));
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.threads, 1..=32)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "batch_threads"));
                                         let sw = ui.available_width();
-                                        ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.threads_batch, 1..=32));
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.threads_batch, 1..=32)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "batch_size"));
                                         let sw = ui.available_width();
-                                        ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.batch_size, 256..=8192).logarithmic(true));
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.batch_size, 256..=8192).logarithmic(true)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "micro_batch"));
                                         let sw = ui.available_width();
-                                        ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.ubatch_size, 64..=2048));
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.ubatch_size, 64..=2048)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
                                     });
                                 });
 
                             egui::CollapsingHeader::new(egui::RichText::new(t(lang, "options")).size(16.0).color(accent))
                                 .default_open(true)
                                 .show(ui, |ui| {
-                                    ui.checkbox(&mut self.launch_config.flash_attn, t(lang, "flash_attn"));
-                                    ui.checkbox(&mut self.launch_config.warmup, t(lang, "warmup"));
-                                    ui.checkbox(&mut self.launch_config.continuous_batching, t(lang, "cont_batching"));
-                                    ui.checkbox(&mut self.launch_config.verbose, t(lang, "verbose"));
+                                    if ui.checkbox(&mut self.launch_config.flash_attn, t(lang, "flash_attn")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if ui.checkbox(&mut self.launch_config.warmup, t(lang, "warmup")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if ui.checkbox(&mut self.launch_config.continuous_batching, t(lang, "cont_batching")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if ui.checkbox(&mut self.launch_config.verbose, t(lang, "verbose")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
                                 });
                         });
                 });
