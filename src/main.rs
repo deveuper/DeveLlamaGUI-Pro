@@ -182,6 +182,16 @@ fn t(lang: Language, key: &str) -> String {
             "will_apply_next" => "Runtime params will be applied on next API call".to_string(),
             "launch_need_restart" => "Launch params require restart to take effect".to_string(),
             "runtime_per_request" => "Runtime params apply per API request".to_string(),
+            "force_overwrite" => "Force Overwrite".to_string(),
+            "restore_default" => "Restore Default".to_string(),
+            "delete_preset" => "Delete".to_string(),
+            "confirm_delete" => "Confirm delete?".to_string(),
+            "preset_restored" => "Preset restored to default".to_string(),
+            "preset_overwritten" => "Preset overwritten".to_string(),
+            "preset_deleted" => "Preset deleted".to_string(),
+            "cannot_delete_last" => "Cannot delete the last preset".to_string(),
+            "ctx_per_seq_warn" => "ctx per seq = total ÷ parallel".to_string(),
+            "server_start_cmd" => "Start command:".to_string(),
             _ => key.to_string(),
         },
         Language::ChineseSimplified => match key {
@@ -268,6 +278,16 @@ fn t(lang: Language, key: &str) -> String {
             "will_apply_next" => "运行时参数将在每次API请求时应用".to_string(),
             "launch_need_restart" => "启动参数需重启服务后生效".to_string(),
             "runtime_per_request" => "运行时参数在每次API请求时传入".to_string(),
+            "force_overwrite" => "强制覆盖".to_string(),
+            "restore_default" => "还原默认".to_string(),
+            "delete_preset" => "删除".to_string(),
+            "confirm_delete" => "确认删除？".to_string(),
+            "preset_restored" => "预设已还原为默认值".to_string(),
+            "preset_overwritten" => "预设已被强制覆盖".to_string(),
+            "preset_deleted" => "预设已删除".to_string(),
+            "cannot_delete_last" => "无法删除最后一个预设".to_string(),
+            "ctx_per_seq_warn" => "每序列上下文 = 总量 ÷ 并行数".to_string(),
+            "server_start_cmd" => "启动命令:".to_string(),
             _ => key.to_string(),
         },
         Language::ChineseTraditional => match key {
@@ -354,6 +374,16 @@ fn t(lang: Language, key: &str) -> String {
             "will_apply_next" => "執行時參數將在每次API請求時套用".to_string(),
             "launch_need_restart" => "啟動參數需重啟服務後生效".to_string(),
             "runtime_per_request" => "執行時參數在每次API請求時傳入".to_string(),
+            "force_overwrite" => "強制覆蓋".to_string(),
+            "restore_default" => "還原預設".to_string(),
+            "delete_preset" => "刪除".to_string(),
+            "confirm_delete" => "確認刪除？".to_string(),
+            "preset_restored" => "預設已還原為預設值".to_string(),
+            "preset_overwritten" => "預設已被強制覆蓋".to_string(),
+            "preset_deleted" => "預設已刪除".to_string(),
+            "cannot_delete_last" => "無法刪除最後一個預設".to_string(),
+            "ctx_per_seq_warn" => "每序列上下文 = 總量 ÷ 並行數".to_string(),
+            "server_start_cmd" => "啟動命令:".to_string(),
             _ => key.to_string(),
         },
         Language::Japanese => match key {
@@ -440,6 +470,16 @@ fn t(lang: Language, key: &str) -> String {
             "will_apply_next" => "実行時パラメータは各APIリクエスト時に適用されます".to_string(),
             "launch_need_restart" => "起動パラメータは再起動後に有効になります".to_string(),
             "runtime_per_request" => "実行時パラメータは各APIリクエストで渡されます".to_string(),
+            "force_overwrite" => "強制上書き".to_string(),
+            "restore_default" => "デフォルトに戻す".to_string(),
+            "delete_preset" => "削除".to_string(),
+            "confirm_delete" => "削除しますか？".to_string(),
+            "preset_restored" => "プリセットをデフォルトに戻しました".to_string(),
+            "preset_overwritten" => "プリセットを強制上書きしました".to_string(),
+            "preset_deleted" => "プリセットを削除しました".to_string(),
+            "cannot_delete_last" => "最後のプリセットは削除できません".to_string(),
+            "ctx_per_seq_warn" => "シーケンスあたりctx = 合計 ÷ パラレル".to_string(),
+            "server_start_cmd" => "起動コマンド:".to_string(),
             _ => key.to_string(),
         },
         Language::Korean => match key {
@@ -526,6 +566,16 @@ fn t(lang: Language, key: &str) -> String {
             "will_apply_next" => "런타임 매개변수는 각 API 요청 시 적용됩니다".to_string(),
             "launch_need_restart" => "시작 매개변수는 재시작 후 적용됩니다".to_string(),
             "runtime_per_request" => "런타임 매개변수는 각 API 요청에 전달됩니다".to_string(),
+            "force_overwrite" => "강제 덮어쓰기".to_string(),
+            "restore_default" => "기본값 복원".to_string(),
+            "delete_preset" => "삭제".to_string(),
+            "confirm_delete" => "삭제하시겠습니까?".to_string(),
+            "preset_restored" => "프리셋이 기본값으로 복원되었습니다".to_string(),
+            "preset_overwritten" => "프리셋이 강제 덮어쓰기되었습니다".to_string(),
+            "preset_deleted" => "프리셋이 삭제되었습니다".to_string(),
+            "cannot_delete_last" => "마지막 프리셋은 삭제할 수 없습니다".to_string(),
+            "ctx_per_seq_warn" => "시퀀스당 ctx = 합계 ÷ 병렬".to_string(),
+            "server_start_cmd" => "시작 명령:".to_string(),
             _ => key.to_string(),
         },
     }
@@ -649,7 +699,7 @@ impl Preset {
                 name: "General Chat".to_string(),
                 description: "Balanced for everyday conversation".to_string(),
                 runtime_params: RuntimeParams {
-                    temperature: 0.8, top_k: 40, top_p: 0.95, min_p: 0.05,
+                    temperature: 0.7, top_k: 40, top_p: 0.9, min_p: 0.05,
                     repeat_penalty: 1.0, repeat_last_n: 64,
                     presence_penalty: 0.0, frequency_penalty: 0.0,
                     n_predict: -1, seed: -1, mirostat: 0,
@@ -658,12 +708,12 @@ impl Preset {
             },
             Preset {
                 name: "Code Mode".to_string(),
-                description: "Low temperature for precise coding".to_string(),
+                description: "Optimized for coding and precise tasks".to_string(),
                 runtime_params: RuntimeParams {
-                    temperature: 0.2, top_k: 20, top_p: 0.85, min_p: 0.1,
-                    repeat_penalty: 1.0, repeat_last_n: 128,
+                    temperature: 0.6, top_k: 20, top_p: 1.0, min_p: 0.0,
+                    repeat_penalty: 1.05, repeat_last_n: 128,
                     presence_penalty: 0.0, frequency_penalty: 0.0,
-                    n_predict: 4096, seed: 42, mirostat: 0,
+                    n_predict: -1, seed: -1, mirostat: 0,
                     mirostat_tau: 5.0, mirostat_eta: 0.1,
                 },
             },
@@ -671,8 +721,8 @@ impl Preset {
                 name: "Creative Writing".to_string(),
                 description: "High temperature for creative output".to_string(),
                 runtime_params: RuntimeParams {
-                    temperature: 1.0, top_k: 80, top_p: 0.95, min_p: 0.02,
-                    repeat_penalty: 1.1, repeat_last_n: 32,
+                    temperature: 0.9, top_k: 64, top_p: 0.95, min_p: 0.03,
+                    repeat_penalty: 1.1, repeat_last_n: 64,
                     presence_penalty: 0.0, frequency_penalty: 0.0,
                     n_predict: -1, seed: -1, mirostat: 2,
                     mirostat_tau: 5.0, mirostat_eta: 0.1,
@@ -682,7 +732,7 @@ impl Preset {
                 name: "OpenClaw".to_string(),
                 description: "Optimized for OpenClaw agent use".to_string(),
                 runtime_params: RuntimeParams {
-                    temperature: 0.3, top_k: 30, top_p: 0.88, min_p: 0.08,
+                    temperature: 0.3, top_k: 40, top_p: 0.9, min_p: 0.05,
                     repeat_penalty: 1.0, repeat_last_n: 96,
                     presence_penalty: 0.0, frequency_penalty: 0.0,
                     n_predict: 8192, seed: -1, mirostat: 0,
@@ -693,11 +743,33 @@ impl Preset {
                 name: "Roleplay".to_string(),
                 description: "For character roleplay scenarios".to_string(),
                 runtime_params: RuntimeParams {
-                    temperature: 0.85, top_k: 60, top_p: 0.92, min_p: 0.03,
-                    repeat_penalty: 1.1, repeat_last_n: 48,
+                    temperature: 0.8, top_k: 64, top_p: 0.92, min_p: 0.03,
+                    repeat_penalty: 1.1, repeat_last_n: 64,
                     presence_penalty: 0.0, frequency_penalty: 0.0,
                     n_predict: -1, seed: -1, mirostat: 2,
                     mirostat_tau: 4.0, mirostat_eta: 0.15,
+                },
+            },
+            Preset {
+                name: "Math & Logic".to_string(),
+                description: "Deterministic for math and reasoning".to_string(),
+                runtime_params: RuntimeParams {
+                    temperature: 0.1, top_k: 10, top_p: 0.8, min_p: 0.1,
+                    repeat_penalty: 1.0, repeat_last_n: 128,
+                    presence_penalty: 0.0, frequency_penalty: 0.0,
+                    n_predict: -1, seed: -1, mirostat: 0,
+                    mirostat_tau: 5.0, mirostat_eta: 0.1,
+                },
+            },
+            Preset {
+                name: "Brainstorm".to_string(),
+                description: "Maximum creativity and divergence".to_string(),
+                runtime_params: RuntimeParams {
+                    temperature: 1.2, top_k: 100, top_p: 0.98, min_p: 0.01,
+                    repeat_penalty: 1.0, repeat_last_n: 32,
+                    presence_penalty: 0.0, frequency_penalty: 0.0,
+                    n_predict: -1, seed: -1, mirostat: 0,
+                    mirostat_tau: 5.0, mirostat_eta: 0.1,
                 },
             },
         ]
@@ -763,8 +835,8 @@ struct RuntimeParams {
 impl Default for RuntimeParams {
     fn default() -> Self {
         Self {
-            temperature: 0.8, top_k: 40, top_p: 0.95, min_p: 0.05,
-            repeat_penalty: 1.0, repeat_last_n: 64,
+            temperature: 0.6, top_k: 20, top_p: 1.0, min_p: 0.0,
+            repeat_penalty: 1.05, repeat_last_n: 64,
             presence_penalty: 0.0, frequency_penalty: 0.0,
             n_predict: -1, seed: -1, mirostat: 0,
             mirostat_tau: 5.0, mirostat_eta: 0.1,
@@ -778,14 +850,18 @@ struct AppSettings {
     language: Language,
     presets: Vec<Preset>,
     last_preset_index: Option<usize>,
+    #[serde(default)]
+    default_presets_snapshot: Vec<Preset>, // 初始预设快照，用于"还原默认"
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
+        let presets = Preset::default_presets();
         Self {
             theme: Theme::Cyberpunk,
             language: Language::English,
-            presets: Preset::default_presets(),
+            default_presets_snapshot: presets.clone(),
+            presets,
             last_preset_index: None,
         }
     }
@@ -839,11 +915,15 @@ struct DeveLlamaGUI {
     show_save_preset_dialog: bool,
     new_preset_name: String,
     new_preset_description: String,
+    confirm_delete_preset_idx: Option<usize>, // 正在确认删除的预设索引
     console_input: String,
     quick_commands: Vec<QuickCommand>,
     show_all_commands: bool,
     config_file_path: PathBuf,
     launch_config_dirty: bool, // 启动参数在运行期间被修改，需要重启
+    server_start_time: Option<std::time::Instant>, // 服务器启动时间，用于延迟验证
+    ctx_verified: bool, // ctx_size是否已通过/props验证
+    ctx_mismatch_warned: bool, // 是否已警告ctx_size不匹配
 }
 
 impl DeveLlamaGUI {
@@ -904,7 +984,11 @@ impl DeveLlamaGUI {
         let config_file_path = Self::get_config_path();
         
         let (loaded_settings, loaded_launch, loaded_runtime) = Self::load_config(&config_file_path);
-        let settings = loaded_settings.unwrap_or(settings);
+        let mut settings = loaded_settings.unwrap_or(settings);
+        // 如果default_presets_snapshot为空(旧配置文件)，用当前默认预设填充
+        if settings.default_presets_snapshot.is_empty() {
+            settings.default_presets_snapshot = Preset::default_presets();
+        }
         let launch_config = loaded_launch.unwrap_or(launch_config);
         let runtime_params = loaded_runtime.unwrap_or(runtime_params);
         
@@ -926,11 +1010,15 @@ impl DeveLlamaGUI {
             show_save_preset_dialog: false,
             new_preset_name: String::new(),
             new_preset_description: String::new(),
+            confirm_delete_preset_idx: None,
             console_input: String::new(),
             quick_commands,
             show_all_commands: false,
             config_file_path,
             launch_config_dirty: false,
+            server_start_time: None,
+            ctx_verified: false,
+            ctx_mismatch_warned: false,
         };
         gui.update_command_preview();
         gui
@@ -1010,6 +1098,67 @@ impl DeveLlamaGUI {
         }
     }
 
+    /// 强制覆盖当前选中的预设为当前运行时参数
+    fn force_overwrite_preset(&mut self) {
+        let lang = self.settings.language;
+        if let Some(idx) = self.settings.last_preset_index {
+            // 先克隆运行时参数，避免借用冲突
+            let params = self.runtime_params.clone();
+            if let Some(preset) = self.settings.presets.get_mut(idx) {
+                let name = preset.name.clone();
+                preset.runtime_params = params;
+                self.save_config();
+                self.params_modified = false;
+                self.params_apply_status = format!("{}: {}", t(lang, "preset_overwritten"), name);
+                self.logs.push(format!("{}: {}", t(lang, "preset_overwritten"), name));
+            }
+        }
+    }
+
+    /// 还原当前选中的预设为默认值
+    fn restore_preset_default(&mut self) {
+        let lang = self.settings.language;
+        if let Some(idx) = self.settings.last_preset_index {
+            if let Some(default_preset) = self.settings.default_presets_snapshot.get(idx).cloned() {
+                // 先取出默认参数的克隆
+                let default_params = default_preset.runtime_params.clone();
+                let default_name = default_preset.name.clone();
+                if let Some(preset) = self.settings.presets.get_mut(idx) {
+                    preset.runtime_params = default_params;
+                }
+                self.runtime_params = default_preset.runtime_params;
+                self.params_modified = false;
+                self.save_config();
+                self.params_apply_status = format!("{}: {}", t(lang, "preset_restored"), default_name);
+                self.logs.push(format!("{}: {}", t(lang, "preset_restored"), default_name));
+            } else {
+                // 非默认预设（用户自己添加的），没有默认快照，提示无法还原
+                self.logs.push("Cannot restore: this is a custom preset with no default.".to_string());
+            }
+        }
+    }
+
+    /// 删除指定索引的预设
+    fn delete_preset(&mut self, idx: usize) {
+        let lang = self.settings.language;
+        if self.settings.presets.len() <= 1 {
+            self.logs.push(t(lang, "cannot_delete_last").to_string());
+            return;
+        }
+        let name = self.settings.presets[idx].name.clone();
+        self.settings.presets.remove(idx);
+        // 修正 last_preset_index
+        if let Some(current) = self.settings.last_preset_index {
+            if current == idx {
+                self.settings.last_preset_index = None;
+            } else if current > idx {
+                self.settings.last_preset_index = Some(current - 1);
+            }
+        }
+        self.save_config();
+        self.logs.push(format!("{}: {}", t(lang, "preset_deleted"), name));
+    }
+
     fn execute_console_command(&mut self) {
         let cmd = self.console_input.trim();
         if cmd.is_empty() { return; }
@@ -1062,14 +1211,14 @@ impl DeveLlamaGUI {
             config.batch_size, config.ubatch_size
         );
         if config.flash_attn { cmd.push_str(" ^\n  --flash-attn on"); }
-        if config.kv_cache_type != "f16" {
-            cmd.push_str(&format!(" ^\n  --cache-type-k {}", config.kv_cache_type));
-            cmd.push_str(&format!(" ^\n  --cache-type-v {}", config.kv_cache_type));
-        }
+        // 始终传递KV缓存类型
+        cmd.push_str(&format!(" ^\n  --cache-type-k {}", config.kv_cache_type));
+        cmd.push_str(&format!(" ^\n  --cache-type-v {}", config.kv_cache_type));
         if config.verbose { cmd.push_str(" ^\n  --verbose"); }
         if !config.warmup { cmd.push_str(" ^\n  --no-warmup"); }
         if !config.continuous_batching { cmd.push_str(" ^\n  --no-cont-batching"); }
-        if config.n_parallel > 1 { cmd.push_str(&format!(" ^\n  --parallel {}", config.n_parallel)); }
+        // 始终传递parallel参数
+        cmd.push_str(&format!(" ^\n  --parallel {}", config.n_parallel));
         if !config.mmproj_path.is_empty() { cmd.push_str(&format!(" ^\n  --mmproj \"{}\"", config.mmproj_path)); }
         cmd.push_str(" ^\n  --props");
         cmd
@@ -1103,14 +1252,14 @@ impl DeveLlamaGUI {
             .arg("--ubatch-size").arg(config.ubatch_size.to_string());
 
         if config.flash_attn { cmd.arg("--flash-attn").arg("on"); }
-        if config.kv_cache_type != "f16" {
-            cmd.arg("--cache-type-k").arg(&config.kv_cache_type);
-            cmd.arg("--cache-type-v").arg(&config.kv_cache_type);
-        }
+        // 始终传递KV缓存类型，确保llama-server使用正确的缓存格式
+        cmd.arg("--cache-type-k").arg(&config.kv_cache_type);
+        cmd.arg("--cache-type-v").arg(&config.kv_cache_type);
         if config.verbose { cmd.arg("--verbose"); }
         if !config.warmup { cmd.arg("--no-warmup"); }
         if !config.continuous_batching { cmd.arg("--no-cont-batching"); }
-        if config.n_parallel > 1 { cmd.arg("--parallel").arg(config.n_parallel.to_string()); }
+        // 始终传递--parallel参数，让用户清楚parallel和ctx-size的关系
+        cmd.arg("--parallel").arg(config.n_parallel.to_string());
         if !config.mmproj_path.is_empty() { cmd.arg("--mmproj").arg(&config.mmproj_path); }
         // 启用props API端点，允许通过GET /props查看运行时属性
         cmd.arg("--props");
@@ -1118,6 +1267,14 @@ impl DeveLlamaGUI {
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
         let lang = self.settings.language;
+        // 记录完整启动命令到日志，方便用户验证参数
+        self.logs.push(format!("{} {}", t(lang, "server_start_cmd"), self.cmd_preview.replace(" ^\n  ", " ")));
+        if config.n_parallel > 1 {
+            let per_seq = config.ctx_size / config.n_parallel;
+            self.logs.push(format!("[INFO] ctx-size={}, parallel={}, ctx per sequence={}", 
+                config.ctx_size, config.n_parallel, per_seq));
+        }
+
         match cmd.spawn() {
             Ok(mut child) => {
                 // 分别用独立线程读取stdout和stderr，避免互相阻塞
@@ -1142,6 +1299,9 @@ impl DeveLlamaGUI {
                 *self.server_process.lock().unwrap() = Some(child);
                 self.is_running = true;
                 self.launch_config_dirty = false;
+                self.server_start_time = Some(std::time::Instant::now());
+                self.ctx_verified = false;
+                self.ctx_mismatch_warned = false;
                 self.status_message = format!("Running on port {}", config.port);
                 self.logs.push(t(lang, "server_started").to_string());
                 self.logs.push(format!("API: {}", self.api_url));
@@ -1162,6 +1322,9 @@ impl DeveLlamaGUI {
         let lang = self.settings.language;
         self.is_running = false;
         self.launch_config_dirty = false;
+        self.server_start_time = None;
+        self.ctx_verified = false;
+        self.ctx_mismatch_warned = false;
         self.status_message = t(lang, "status_stopped").to_string();
         self.logs.push(t(lang, "server_stopped").to_string());
         self.params_apply_status.clear();
@@ -1192,6 +1355,25 @@ impl DeveLlamaGUI {
                         self.params_apply_status = t(lang, "runtime_params_updated").to_string();
                         self.logs.push(format!("[API] Server props: {}", stdout.trim()));
                         self.logs.push("[INFO] Note: Runtime params (temp, top_k, etc.) are applied per-request via /completion or /v1/chat/completions API.".to_string());
+
+                        // 验证ctx_size是否与设置一致
+                        if let Ok(props) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                            if let Some(n_ctx) = props.get("n_ctx").and_then(|v| v.as_i64()) {
+                                let expected = self.launch_config.ctx_size as i64;
+                                if n_ctx != expected {
+                                    self.logs.push(format!(
+                                        "[WARN] ctx_size mismatch! Server actual: {}, GUI setting: {}. The model may not support the requested context size.",
+                                        n_ctx, expected
+                                    ));
+                                    self.logs.push(format!(
+                                        "[INFO] The actual ctx per sequence may be {} (total / parallel). Model max context may limit the value.",
+                                        n_ctx
+                                    ));
+                                } else {
+                                    self.logs.push(format!("[OK] ctx_size verified: {} matches GUI setting", n_ctx));
+                                }
+                            }
+                        }
                     } else {
                         let stderr = String::from_utf8_lossy(&output.stderr);
                         self.params_apply_status = format!("API Error: {}", stderr.trim());
@@ -1214,6 +1396,59 @@ impl DeveLlamaGUI {
         self.save_config();
         if self.is_running {
             self.launch_config_dirty = true;
+        }
+    }
+
+    /// 启动后自动验证ctx_size是否与llama-server实际值匹配
+    /// 通过GET /props获取n_ctx，与GUI设置对比
+    fn auto_verify_ctx(&mut self) {
+        if self.ctx_verified || !self.is_running { return; }
+        
+        let url = format!("http://{}:{}/props", self.launch_config.host, self.launch_config.port);
+        let mut cmd = Command::new("curl");
+        cmd.args(["-s", "--connect-timeout", "2", &url]);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+        
+        match cmd.output() {
+            Ok(output) => {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    if let Ok(props) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                        if let Some(n_ctx) = props.get("n_ctx").and_then(|v| v.as_i64()) {
+                            let expected = self.launch_config.ctx_size as i64;
+                            if n_ctx == expected {
+                                self.ctx_verified = true;
+                                self.logs.push(format!("[✓] ctx_size verified: {} (matches GUI setting)", n_ctx));
+                            } else {
+                                self.ctx_verified = true;
+                                self.ctx_mismatch_warned = true;
+                                self.logs.push(format!(
+                                    "[⚠] ctx_size MISMATCH! Server actual: {}, GUI setting: {}",
+                                    n_ctx, expected
+                                ));
+                                if self.launch_config.n_parallel > 1 {
+                                    self.logs.push(format!(
+                                        "[INFO] This may be due to --parallel {}: ctx_per_seq = {} / {} = {}",
+                                        self.launch_config.n_parallel,
+                                        n_ctx,
+                                        self.launch_config.n_parallel,
+                                        n_ctx / self.launch_config.n_parallel as i64
+                                    ));
+                                }
+                                self.logs.push("[TIP] The model may not support the requested context size. Check llama-server logs for details.".to_string());
+                            }
+                        }
+                    }
+                }
+                // 如果连接失败（服务器还没启动完成），不标记verified，下次再试
+            }
+            Err(_) => {
+                // curl不可用或服务器还没启动，不标记verified
+            }
         }
     }
 
@@ -1285,6 +1520,28 @@ impl eframe::App for DeveLlamaGUI {
         // 同步后台线程的日志到主日志
         if let Ok(mut shared) = self.shared_logs.lock() {
             if !shared.is_empty() {
+                // 检测llama-server输出中的关键错误/警告信息
+                for line in shared.iter() {
+                    let line_lower = line.to_lowercase();
+                    if line_lower.contains("ggml_assert") || line_lower.contains("assert") && line_lower.contains("failed") {
+                        self.ctx_mismatch_warned = true;
+                        self.ctx_verified = true; // 标记为已验证（虽然验证结果为失败）
+                    }
+                    if line_lower.contains("n_ctx_per_seq") && line_lower.contains("n_ctx_train") {
+                        // llama-server提示每序列上下文小于训练上下文
+                        if !self.ctx_mismatch_warned {
+                            self.ctx_mismatch_warned = true;
+                            self.ctx_verified = true;
+                        }
+                    }
+                    if line_lower.contains("full capacity") && line_lower.contains("not be utilized") {
+                        // "the full capacity of the model will not be utilized"
+                        if !self.ctx_mismatch_warned {
+                            self.ctx_mismatch_warned = true;
+                            self.ctx_verified = true;
+                        }
+                    }
+                }
                 self.logs.append(&mut shared);
                 // 限制主日志数量
                 if self.logs.len() > 200 {
@@ -1302,6 +1559,15 @@ impl eframe::App for DeveLlamaGUI {
         // 进程运行时用较低频率刷新以检测退出状态
         if self.is_running {
             ctx.request_repaint_after(std::time::Duration::from_secs(1));
+            
+            // 启动后3秒自动验证ctx_size是否与llama-server实际值匹配
+            if !self.ctx_verified {
+                if let Some(start_time) = self.server_start_time {
+                    if start_time.elapsed() >= std::time::Duration::from_secs(3) {
+                        self.auto_verify_ctx();
+                    }
+                }
+            }
         }
 
         // 全局字体变大
@@ -1339,6 +1605,18 @@ impl eframe::App for DeveLlamaGUI {
                 if self.is_running && self.launch_config_dirty {
                     ui.separator();
                     ui.label(egui::RichText::new(format!("⚠ {}", t(lang, "launch_need_restart"))).size(13.0).color(egui::Color32::YELLOW));
+                }
+                
+                // 如果ctx_size验证不匹配，显示红色警告
+                if self.is_running && self.ctx_mismatch_warned {
+                    ui.separator();
+                    ui.label(egui::RichText::new("⚠ ctx_size mismatch!").size(13.0).color(error));
+                }
+                
+                // 如果ctx_size验证通过，显示绿色标记
+                if self.is_running && self.ctx_verified && !self.ctx_mismatch_warned {
+                    ui.separator();
+                    ui.label(egui::RichText::new("✓ ctx OK").size(13.0).color(success));
                 }
                 
                 ui.separator();
@@ -1552,11 +1830,19 @@ impl eframe::App for DeveLlamaGUI {
                                     });
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "ctx_size"));
-                                        let sw = ui.available_width();
-                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.ctx_size, 512..=131072).logarithmic(true)).changed() {
+                                        let sw = ui.available_width() - 90.0;
+                                        if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.ctx_size, 512..=999999).logarithmic(true)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.ctx_size).speed(512).range(512..=999999)).changed() {
                                             self.on_launch_param_changed();
                                         }
                                     });
+                                    // parallel_slots > 1 时提示 ctx_size 会被均分
+                                    if self.launch_config.n_parallel > 1 {
+                                        let per_seq = self.launch_config.ctx_size / self.launch_config.n_parallel;
+                                        ui.label(egui::RichText::new(format!("⚠ ctx/seq = {} (total ÷ parallel)", per_seq)).size(11.0).color(egui::Color32::YELLOW));
+                                    }
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "parallel_slots"));
                                         let sw = ui.available_width();
@@ -1693,6 +1979,41 @@ impl eframe::App for DeveLlamaGUI {
                                     if let Some(idx) = self.settings.last_preset_index { self.apply_preset(idx); }
                                 }
                             });
+
+                            // 预设管理按钮行（强制覆盖 / 还原默认 / 删除）
+                            if self.settings.last_preset_index.is_some() {
+                                ui.horizontal(|ui| {
+                                    if ui.button(egui::RichText::new(t(lang, "force_overwrite")).size(12.0)).clicked() {
+                                        self.force_overwrite_preset();
+                                    }
+                                    if ui.button(egui::RichText::new(t(lang, "restore_default")).size(12.0)).clicked() {
+                                        self.restore_preset_default();
+                                    }
+                                    if ui.button(egui::RichText::new(t(lang, "delete_preset")).size(12.0)).clicked() {
+                                        if let Some(idx) = self.settings.last_preset_index {
+                                            self.confirm_delete_preset_idx = Some(idx);
+                                        }
+                                    }
+                                });
+                            }
+
+                            // 删除确认提示
+                            if let Some(del_idx) = self.confirm_delete_preset_idx {
+                                let del_name = self.settings.presets.get(del_idx)
+                                    .map(|p| p.name.clone())
+                                    .unwrap_or_default();
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new(format!("{} {}?", t(lang, "confirm_delete"), del_name))
+                                        .size(12.0).color(egui::Color32::YELLOW));
+                                    if ui.button("✓").clicked() {
+                                        self.delete_preset(del_idx);
+                                        self.confirm_delete_preset_idx = None;
+                                    }
+                                    if ui.button("✗").clicked() {
+                                        self.confirm_delete_preset_idx = None;
+                                    }
+                                });
+                            }
                             
                             if !self.params_apply_status.is_empty() {
                                 let color = if self.params_modified { egui::Color32::YELLOW } else { success };
