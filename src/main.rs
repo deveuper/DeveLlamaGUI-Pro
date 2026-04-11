@@ -1584,7 +1584,7 @@ impl eframe::App for DeveLlamaGUI {
             // 上边留白，不顶上边栏
             ui.add_space(12.0);
             
-            // 第一行：标题 + 状态
+            // 第一行：标题 + 状态 + 主题/语言(左) + API地址(右对齐)
             ui.horizontal(|ui| {
                 ui.add_space(14.0);
                 ui.label(egui::RichText::new(t(lang, "app_title")).size(24.0).color(accent).strong());
@@ -1618,32 +1618,31 @@ impl eframe::App for DeveLlamaGUI {
                     ui.separator();
                     ui.label(egui::RichText::new("✓ ctx OK").size(13.0).color(success));
                 }
+
+                // 主题切换（放在左侧区域，避免与右侧API地址重叠）
+                ui.menu_button(t(lang, "theme"), |ui| {
+                    for theme in [Theme::Cyberpunk, Theme::MinimalLight, Theme::SakuraPink, 
+                                  Theme::OceanBlue, Theme::Midnight, Theme::ForestGreen] {
+                        if ui.selectable_label(self.settings.theme == theme, theme.name()).clicked() {
+                            self.settings.theme = theme;
+                            self.save_config();
+                        }
+                    }
+                });
+
+                // 语言切换菜单
+                ui.menu_button(self.settings.language.name(), |ui| {
+                    for l in Language::all() {
+                        if ui.selectable_label(self.settings.language == l, l.display_name()).clicked() {
+                            self.set_language(l);
+                        }
+                    }
+                });
                 
-                ui.separator();
-                ui.monospace(&self.api_url);
-                
+                // 用剩余空间推开，API地址靠右显示
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_space(14.0);
-                    
-                    // 语言切换菜单
-                    ui.menu_button(self.settings.language.name(), |ui| {
-                        for l in Language::all() {
-                            if ui.selectable_label(self.settings.language == l, l.display_name()).clicked() {
-                                self.set_language(l);
-                            }
-                        }
-                    });
-                    ui.separator();
-                    
-                    ui.menu_button(t(lang, "theme"), |ui| {
-                        for theme in [Theme::Cyberpunk, Theme::MinimalLight, Theme::SakuraPink, 
-                                      Theme::OceanBlue, Theme::Midnight, Theme::ForestGreen] {
-                            if ui.selectable_label(self.settings.theme == theme, theme.name()).clicked() {
-                                self.settings.theme = theme;
-                                self.save_config();
-                            }
-                        }
-                    });
+                    ui.monospace(&self.api_url);
                 });
             });
             
