@@ -1269,6 +1269,7 @@ impl DeveLlamaGUI {
         let lang = self.settings.language;
         // 记录完整启动命令到日志，方便用户验证参数
         self.logs.push(format!("{} {}", t(lang, "server_start_cmd"), self.cmd_preview.replace(" ^\n  ", " ")));
+        self.logs.push(format!("[INFO] Loading model: {}", self.get_model_name()));
         if config.n_parallel > 1 {
             let per_seq = config.ctx_size / config.n_parallel;
             self.logs.push(format!("[INFO] ctx-size={}, parallel={}, ctx per sequence={}", 
@@ -1316,7 +1317,21 @@ impl DeveLlamaGUI {
 
     fn stop_server(&mut self) {
         if let Some(mut child) = self.server_process.lock().unwrap().take() {
-            let _ = child.kill();
+            let pid = child.id();
+            // Windows: 用taskkill /T /F杀掉整个进程树（包括子进程）
+            // child.kill()只杀父进程，GPU worker子进程会残留占用端口
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                let _ = Command::new("taskkill")
+                    .args(["/T", "/F", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .output();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = child.kill();
+            }
             let _ = child.wait();
         }
         let lang = self.settings.language;
@@ -1463,8 +1478,7 @@ impl DeveLlamaGUI {
             .set_directory("H:\\AI\\models")
             .pick_file() {
             self.launch_config.model_path = path.to_string_lossy().to_string();
-            self.update_command_preview();
-            self.save_config();
+            self.on_launch_param_changed();
         }
     }
 
@@ -1474,8 +1488,7 @@ impl DeveLlamaGUI {
             .set_directory("H:\\AI\\llama.cpp")
             .pick_file() {
             self.launch_config.llama_server_path = path.to_string_lossy().to_string();
-            self.update_command_preview();
-            self.save_config();
+            self.on_launch_param_changed();
         }
     }
 
@@ -1485,8 +1498,7 @@ impl DeveLlamaGUI {
             .set_directory("H:\\AI\\models")
             .pick_file() {
             self.launch_config.mmproj_path = path.to_string_lossy().to_string();
-            self.update_command_preview();
-            self.save_config();
+            self.on_launch_param_changed();
         }
     }
 
@@ -1518,8 +1530,10 @@ impl DeveLlamaGUI {
 impl eframe::App for DeveLlamaGUI {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // 同步后台线程的日志到主日志
+        let mut has_new_logs = false;
         if let Ok(mut shared) = self.shared_logs.lock() {
             if !shared.is_empty() {
+                has_new_logs = true;
                 // 检测llama-server输出中的关键错误/警告信息
                 for line in shared.iter() {
                     let line_lower = line.to_lowercase();
@@ -1556,9 +1570,14 @@ impl eframe::App for DeveLlamaGUI {
         let error = self.settings.theme.error_color();
         let lang = self.settings.language;
 
-        // 进程运行时用较低频率刷新以检测退出状态
-        if self.is_running {
+        // 智能刷新策略：有新日志或服务运行中时按需刷新，空闲时低频刷新
+        if self.is_running || has_new_logs || !self.ctx_verified {
             ctx.request_repaint_after(std::time::Duration::from_secs(1));
+        } else {
+            // 空闲时5秒刷新一次，降低CPU和内存占用
+            ctx.request_repaint_after(std::time::Duration::from_secs(5));
+        }
+        if self.is_running {
             
             // 启动后3秒自动验证ctx_size是否与llama-server实际值匹配
             if !self.ctx_verified {
@@ -2243,6 +2262,7 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1100.0, 750.0])
             .with_min_inner_size([900.0, 650.0]),
+        follow_system_theme: false, // 不追踪系统主题变化，节省开销
         ..Default::default()
     };
     eframe::run_native("DeveLlamaGUI Pro", options, Box::new(|cc| Ok(Box::new(DeveLlamaGUI::new(cc)))))
