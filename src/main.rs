@@ -120,6 +120,10 @@ fn t(lang: Language, key: &str) -> String {
             "warmup" => "Warmup".to_string(),
             "cont_batching" => "Continuous Batching".to_string(),
             "verbose" => "Verbose Logging".to_string(),
+            "thinking_mode" => "Thinking Mode".to_string(),
+            "thinking_auto" => "Auto".to_string(),
+            "thinking_on" => "On".to_string(),
+            "thinking_off" => "Off".to_string(),
             "start" => "START".to_string(),
             "stop" => "STOP".to_string(),
             "open_webui" => "Open WebUI".to_string(),
@@ -216,6 +220,10 @@ fn t(lang: Language, key: &str) -> String {
             "warmup" => "预热".to_string(),
             "cont_batching" => "连续批处理".to_string(),
             "verbose" => "详细日志".to_string(),
+            "thinking_mode" => "思考模式".to_string(),
+            "thinking_auto" => "自动".to_string(),
+            "thinking_on" => "开启".to_string(),
+            "thinking_off" => "关闭".to_string(),
             "start" => "启动".to_string(),
             "stop" => "停止".to_string(),
             "open_webui" => "打开WebUI".to_string(),
@@ -312,6 +320,10 @@ fn t(lang: Language, key: &str) -> String {
             "warmup" => "預熱".to_string(),
             "cont_batching" => "連續批次處理".to_string(),
             "verbose" => "詳細日誌".to_string(),
+            "thinking_mode" => "思考模式".to_string(),
+            "thinking_auto" => "自動".to_string(),
+            "thinking_on" => "開啟".to_string(),
+            "thinking_off" => "關閉".to_string(),
             "start" => "啟動".to_string(),
             "stop" => "停止".to_string(),
             "open_webui" => "開啟WebUI".to_string(),
@@ -408,6 +420,10 @@ fn t(lang: Language, key: &str) -> String {
             "warmup" => "ウォームアップ".to_string(),
             "cont_batching" => "連続バッチ処理".to_string(),
             "verbose" => "詳細ログ".to_string(),
+            "thinking_mode" => "思考モード".to_string(),
+            "thinking_auto" => "自動".to_string(),
+            "thinking_on" => "オン".to_string(),
+            "thinking_off" => "オフ".to_string(),
             "start" => "開始".to_string(),
             "stop" => "停止".to_string(),
             "open_webui" => "WebUIを開く".to_string(),
@@ -504,6 +520,10 @@ fn t(lang: Language, key: &str) -> String {
             "warmup" => "웜업".to_string(),
             "cont_batching" => "연속 배치 처리".to_string(),
             "verbose" => "상세 로그".to_string(),
+            "thinking_mode" => "사고 모드".to_string(),
+            "thinking_auto" => "자동".to_string(),
+            "thinking_on" => "켜기".to_string(),
+            "thinking_off" => "끄기".to_string(),
             "start" => "시작".to_string(),
             "stop" => "중지".to_string(),
             "open_webui" => "WebUI 열기".to_string(),
@@ -797,6 +817,8 @@ struct LaunchConfig {
     continuous_batching: bool,
     n_parallel: i32,
     mmproj_path: String,
+    /// "on" | "off" | "auto" — controls --reasoning flag
+    reasoning_mode: String,
 }
 
 impl Default for LaunchConfig {
@@ -819,6 +841,7 @@ impl Default for LaunchConfig {
             continuous_batching: true,
             n_parallel: 1,
             mmproj_path: String::new(),
+            reasoning_mode: "auto".to_string(),
         }
     }
 }
@@ -1220,6 +1243,22 @@ impl DeveLlamaGUI {
         // 始终传递parallel参数
         cmd.push_str(&format!(" ^\n  --parallel {}", config.n_parallel));
         if !config.mmproj_path.is_empty() { cmd.push_str(&format!(" ^\n  --mmproj \"{}\"", config.mmproj_path)); }
+        // 思考模式：on/off/auto
+        // off 时三管齐下确保 Qwen3/3.5 等模型真正关闭 thinking：
+        //   1) --reasoning off: 服务端不处理 reasoning
+        //   2) --chat-template-kwargs '{"enable_thinking":false}': Jinja 模板层面关闭
+        //   3) --reasoning-budget 0: 思考预算设为 0，立即终止
+        match config.reasoning_mode.as_str() {
+            "off" => {
+                cmd.push_str(" ^\n  --reasoning off");
+                cmd.push_str(" ^\n  --reasoning-budget 0");
+                cmd.push_str(" ^\n  --chat-template-kwargs \"{\\\"enable_thinking\\\":false}\"");
+            }
+            "on" => {
+                cmd.push_str(" ^\n  --reasoning on");
+            }
+            _ => {} // auto: 不传参数，使用 llama-server 默认行为
+        }
         cmd.push_str(" ^\n  --props");
         cmd
     }
@@ -1261,6 +1300,18 @@ impl DeveLlamaGUI {
         // 始终传递--parallel参数，让用户清楚parallel和ctx-size的关系
         cmd.arg("--parallel").arg(config.n_parallel.to_string());
         if !config.mmproj_path.is_empty() { cmd.arg("--mmproj").arg(&config.mmproj_path); }
+        // 思考模式：off 时三管齐下确保 Qwen3/3.5 等模型真正关闭 thinking
+        match config.reasoning_mode.as_str() {
+            "off" => {
+                cmd.arg("--reasoning").arg("off");
+                cmd.arg("--reasoning-budget").arg("0");
+                cmd.arg("--chat-template-kwargs").arg("{\"enable_thinking\":false}");
+            }
+            "on" => {
+                cmd.arg("--reasoning").arg("on");
+            }
+            _ => {} // auto: 不传参数
+        }
         // 启用props API端点，允许通过GET /props查看运行时属性
         cmd.arg("--props");
 
@@ -1599,11 +1650,11 @@ impl eframe::App for DeveLlamaGUI {
         ctx.set_style(style);
 
         // ========== 顶部标题栏（标题 + 启动/停止/打开WebUI按钮 + 状态信息） ==========
-        egui::TopBottomPanel::top("title_bar").exact_height(90.0).show(ctx, |ui| {
+        egui::TopBottomPanel::top("title_bar").exact_height(100.0).show(ctx, |ui| {
             // 上边留白，不顶上边栏
-            ui.add_space(12.0);
+            ui.add_space(10.0);
             
-            // 第一行：标题 + 状态 + 主题/语言(左) + API地址(右对齐)
+            // 第一行：标题 + 状态 + 主题/语言
             ui.horizontal(|ui| {
                 ui.add_space(14.0);
                 ui.label(egui::RichText::new(t(lang, "app_title")).size(24.0).color(accent).strong());
@@ -1638,7 +1689,7 @@ impl eframe::App for DeveLlamaGUI {
                     ui.label(egui::RichText::new("✓ ctx OK").size(13.0).color(success));
                 }
 
-                // 主题切换（放在左侧区域，避免与右侧API地址重叠）
+                // 主题切换
                 ui.menu_button(t(lang, "theme"), |ui| {
                     for theme in [Theme::Cyberpunk, Theme::MinimalLight, Theme::SakuraPink, 
                                   Theme::OceanBlue, Theme::Midnight, Theme::ForestGreen] {
@@ -1657,21 +1708,13 @@ impl eframe::App for DeveLlamaGUI {
                         }
                     }
                 });
-                
-                // 用剩余空间推开，API地址靠右显示
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.add_space(14.0);
-                    ui.monospace(&self.api_url);
-                });
             });
-            
-            ui.add_space(4.0);
-            
-            // 第二行：启动/停止 + 打开WebUI + 复制命令 按钮
+
+            // 第二行：启动/停止 + 打开WebUI + 复制命令 + 思考模式 + API地址(右对齐)
             ui.horizontal(|ui| {
                 ui.add_space(14.0);
                 ui.spacing_mut().button_padding = egui::vec2(18.0, 8.0);
-                
+
                 if !self.is_running {
                     let btn = ui.add_sized([120.0, 34.0],
                         egui::Button::new(egui::RichText::new(t(lang, "start")).size(16.0).strong().color(egui::Color32::BLACK))
@@ -1683,18 +1726,56 @@ impl eframe::App for DeveLlamaGUI {
                             .fill(error));
                     if btn.clicked() { self.stop_server(); }
                 }
-                
+
                 let btn = ui.add_sized([130.0, 34.0],
                     egui::Button::new(egui::RichText::new(t(lang, "open_webui")).size(14.0)));
                 if btn.clicked() && self.is_running { self.open_web_ui(); }
-                
+
                 ui.separator();
-                
+
                 // 复制启动命令按钮
                 if ui.button(egui::RichText::new("📋 Copy CMD").size(13.0)).clicked() {
                     self.copy_to_clipboard(&self.cmd_preview);
                     self.logs.push("Command copied to clipboard.".to_string());
                 }
+
+                // 右侧区域：思考模式 + API地址（right_to_left，最右边是API地址）
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // 最右侧：API地址
+                    ui.monospace(egui::RichText::new(&self.api_url).size(12.0).color(accent));
+                    ui.separator();
+
+                    // 思考模式下拉框
+                    let modes = [
+                        t(lang, "thinking_auto"),
+                        t(lang, "thinking_on"),
+                        t(lang, "thinking_off"),
+                    ];
+                    let mode_vals = ["auto", "on", "off"];
+                    let current_val = self.launch_config.reasoning_mode.clone();
+                    let current = current_val.as_str();
+                    let selected_text = match current {
+                        "on" => modes[1].clone(),
+                        "off" => modes[2].clone(),
+                        _ => modes[0].clone(),
+                    };
+                    let mut new_mode: Option<String> = None;
+                    egui::ComboBox::from_id_source("thinking_mode_selector")
+                        .width(72.0)
+                        .selected_text(&selected_text)
+                        .show_ui(ui, |ui| {
+                            for (i, label) in modes.iter().enumerate() {
+                                if ui.selectable_label(current == mode_vals[i], label.as_str()).clicked() {
+                                    new_mode = Some(mode_vals[i].to_string());
+                                }
+                            }
+                        });
+                    if let Some(mode) = new_mode {
+                        self.launch_config.reasoning_mode = mode;
+                        self.on_launch_param_changed();
+                    }
+                    ui.label(egui::RichText::new(t(lang, "thinking_mode")).size(13.0));
+                });
             });
         });
 
