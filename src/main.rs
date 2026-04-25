@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use std::io::Read;
 use std::thread;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 type SharedLogs = Arc<Mutex<Vec<String>>>;
 
@@ -112,6 +114,16 @@ fn t(lang: Language, key: &str) -> String {
             "ctx_size" => "Context Size:".to_string(),
             "parallel_slots" => "Parallel Slots:".to_string(),
             "kv_cache" => "KV Cache:".to_string(),
+            "kv_cache_k" => "KV Cache K:".to_string(),
+            "kv_cache_v" => "KV Cache V:".to_string(),
+            "gpu_offload" => "GPU Offload:".to_string(),
+            "gpu_offload_gb" => "GPU Offload (GB):".to_string(),
+            "gpu_vram_total" => "GPU VRAM:".to_string(),
+            "gpu_vram_used" => "Model/Cache Est:".to_string(),
+            "gpu_vram_free" => "Free Est:".to_string(),
+            "detect_gpu" => "Detect GPU".to_string(),
+            "gpu_detected" => "Detected:".to_string(),
+            "gpu_not_detected" => "GPU not detected".to_string(),
             "threads" => "Threads:".to_string(),
             "batch_threads" => "Batch Threads:".to_string(),
             "batch_size" => "Batch Size:".to_string(),
@@ -196,6 +208,59 @@ fn t(lang: Language, key: &str) -> String {
             "cannot_delete_last" => "Cannot delete the last preset".to_string(),
             "ctx_per_seq_warn" => "ctx per seq = total ÷ parallel".to_string(),
             "server_start_cmd" => "Start command:".to_string(),
+            // ===== GPU Allocation =====
+            "gpu_allocation" => "GPU Allocation".to_string(),
+            "split_mode" => "Split Mode:".to_string(),
+            "split_none" => "None (single GPU)".to_string(),
+            "split_layer" => "Layer (default)".to_string(),
+            "split_row" => "Row".to_string(),
+            "tensor_split" => "Tensor Split:".to_string(),
+            "tensor_split_hint" => "e.g. 3,1 for 2 GPUs".to_string(),
+            "main_gpu" => "Main GPU:".to_string(),
+            "cpu_moe" => "MoE on CPU".to_string(),
+            "n_cpu_moe" => "MoE CPU Layers:".to_string(),
+            "device" => "Device:".to_string(),
+            // ===== RoPE =====
+            "rope_settings" => "RoPE Settings".to_string(),
+            "rope_scaling" => "RoPE Scaling:".to_string(),
+            "rope_scale" => "RoPE Scale:".to_string(),
+            "rope_freq_base" => "Freq Base:".to_string(),
+            "rope_freq_scale" => "Freq Scale:".to_string(),
+            "yarn_orig_ctx" => "YaRN Orig Ctx:".to_string(),
+            "rope_hint" => "0 = model default".to_string(),
+            // ===== Memory =====
+            "memory_settings" => "Memory".to_string(),
+            "mlock" => "Lock in RAM (mlock)".to_string(),
+            "no_mmap" => "Disable mmap".to_string(),
+            "numa" => "NUMA:".to_string(),
+            "numa_disabled" => "Disabled".to_string(),
+            "numa_distribute" => "Distribute".to_string(),
+            "numa_isolate" => "Isolate".to_string(),
+            "numa_numactl" => "numactl".to_string(),
+            "override_tensor" => "Override Tensor:".to_string(),
+            "override_tensor_hint" => "e.g. up=bf16".to_string(),
+            // ===== LoRA =====
+            "lora_settings" => "LoRA Adapter".to_string(),
+            "lora_path" => "LoRA:".to_string(),
+            "lora_scaled" => "LoRA Scaled:".to_string(),
+            "lora_hint" => "path:scale, e.g. lora.bin:0.5".to_string(),
+            // ===== Advanced =====
+            "advanced" => "Advanced".to_string(),
+            "api_key" => "API Key:".to_string(),
+            "timeout" => "Timeout (s):".to_string(),
+            "threads_http" => "HTTP Threads:".to_string(),
+            "cache_prompt" => "Cache Prompt".to_string(),
+            "context_shift" => "Context Shift".to_string(),
+            "metrics" => "Metrics Endpoint".to_string(),
+            // ===== GPU Auto Fit =====
+            "gpu_layers_hint" => "999 = all layers to GPU".to_string(),
+            "gpu_fit" => "Auto GPU Fit".to_string(),
+            "gpu_fit_desc" => "Auto-adjust layers & ctx to fit VRAM".to_string(),
+            "fit_target" => "Reserve VRAM (MiB):".to_string(),
+            "fit_ctx" => "Min Ctx (fit):".to_string(),
+            "est_vram" => "Est. VRAM usage".to_string(),
+            "auto_fit_on" => "Auto-fit enabled, layers auto-calculated".to_string(),
+            "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
         },
         Language::ChineseSimplified => match key {
@@ -212,6 +277,16 @@ fn t(lang: Language, key: &str) -> String {
             "ctx_size" => "上下文大小:".to_string(),
             "parallel_slots" => "并行槽位:".to_string(),
             "kv_cache" => "KV缓存:".to_string(),
+            "kv_cache_k" => "K缓存:".to_string(),
+            "kv_cache_v" => "V缓存:".to_string(),
+            "gpu_offload" => "GPU卸载:".to_string(),
+            "gpu_offload_gb" => "GPU加载(GB):".to_string(),
+            "gpu_vram_total" => "GPU显存:".to_string(),
+            "gpu_vram_used" => "模型/缓存预估:".to_string(),
+            "gpu_vram_free" => "可用预估:".to_string(),
+            "detect_gpu" => "检测GPU".to_string(),
+            "gpu_detected" => "已检测:".to_string(),
+            "gpu_not_detected" => "未检测到GPU".to_string(),
             "threads" => "线程数:".to_string(),
             "batch_threads" => "批处理线程:".to_string(),
             "batch_size" => "批处理大小:".to_string(),
@@ -296,6 +371,59 @@ fn t(lang: Language, key: &str) -> String {
             "cannot_delete_last" => "无法删除最后一个预设".to_string(),
             "ctx_per_seq_warn" => "每序列上下文 = 总量 ÷ 并行数".to_string(),
             "server_start_cmd" => "启动命令:".to_string(),
+            // ===== GPU分配 =====
+            "gpu_allocation" => "GPU分配".to_string(),
+            "split_mode" => "分割模式:".to_string(),
+            "split_none" => "无（单GPU）".to_string(),
+            "split_layer" => "按层（默认）".to_string(),
+            "split_row" => "按行".to_string(),
+            "tensor_split" => "张量分割:".to_string(),
+            "tensor_split_hint" => "如 3,1 表示双卡比例".to_string(),
+            "main_gpu" => "主GPU:".to_string(),
+            "cpu_moe" => "MoE留在CPU".to_string(),
+            "n_cpu_moe" => "MoE CPU层数:".to_string(),
+            "device" => "设备:".to_string(),
+            // ===== RoPE =====
+            "rope_settings" => "RoPE设置".to_string(),
+            "rope_scaling" => "RoPE缩放:".to_string(),
+            "rope_scale" => "缩放因子:".to_string(),
+            "rope_freq_base" => "频率基数:".to_string(),
+            "rope_freq_scale" => "频率缩放:".to_string(),
+            "yarn_orig_ctx" => "YaRN原始上下文:".to_string(),
+            "rope_hint" => "0 = 使用模型默认值".to_string(),
+            // ===== 内存 =====
+            "memory_settings" => "内存".to_string(),
+            "mlock" => "锁定内存(mlock)".to_string(),
+            "no_mmap" => "禁用mmap".to_string(),
+            "numa" => "NUMA:".to_string(),
+            "numa_disabled" => "禁用".to_string(),
+            "numa_distribute" => "均匀分布".to_string(),
+            "numa_isolate" => "隔离".to_string(),
+            "numa_numactl" => "numactl".to_string(),
+            "override_tensor" => "覆盖张量:".to_string(),
+            "override_tensor_hint" => "如 up=bf16".to_string(),
+            // ===== LoRA =====
+            "lora_settings" => "LoRA适配器".to_string(),
+            "lora_path" => "LoRA:".to_string(),
+            "lora_scaled" => "缩放LoRA:".to_string(),
+            "lora_hint" => "路径:比例，如 lora.bin:0.5".to_string(),
+            // ===== 高级 =====
+            "advanced" => "高级选项".to_string(),
+            "api_key" => "API密钥:".to_string(),
+            "timeout" => "超时(秒):".to_string(),
+            "threads_http" => "HTTP线程:".to_string(),
+            "cache_prompt" => "提示缓存".to_string(),
+            "context_shift" => "上下文移位".to_string(),
+            "metrics" => "指标端点".to_string(),
+            // ===== GPU自动适配 =====
+            "gpu_layers_hint" => "999 = 全部加载到GPU".to_string(),
+            "gpu_fit" => "自动适配显存".to_string(),
+            "gpu_fit_desc" => "自动调整层数和ctx适配显存".to_string(),
+            "fit_target" => "预留显存(MiB):".to_string(),
+            "fit_ctx" => "最小上下文(fit):".to_string(),
+            "est_vram" => "预估显存占用".to_string(),
+            "auto_fit_on" => "自动适配已开启，层数将自动计算".to_string(),
+            "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
         },
         Language::ChineseTraditional => match key {
@@ -312,6 +440,16 @@ fn t(lang: Language, key: &str) -> String {
             "ctx_size" => "上下文大小:".to_string(),
             "parallel_slots" => "並行槽位:".to_string(),
             "kv_cache" => "KV快取:".to_string(),
+            "kv_cache_k" => "K快取:".to_string(),
+            "kv_cache_v" => "V快取:".to_string(),
+            "gpu_offload" => "GPU卸載:".to_string(),
+            "gpu_offload_gb" => "GPU載入(GB):".to_string(),
+            "gpu_vram_total" => "GPU顯存:".to_string(),
+            "gpu_vram_used" => "模型/快取預估:".to_string(),
+            "gpu_vram_free" => "可用預估:".to_string(),
+            "detect_gpu" => "偵測GPU".to_string(),
+            "gpu_detected" => "已偵測:".to_string(),
+            "gpu_not_detected" => "未偵測到GPU".to_string(),
             "threads" => "執行緒數:".to_string(),
             "batch_threads" => "批次執行緒:".to_string(),
             "batch_size" => "批次大小:".to_string(),
@@ -396,6 +534,59 @@ fn t(lang: Language, key: &str) -> String {
             "cannot_delete_last" => "無法刪除最後一個預設".to_string(),
             "ctx_per_seq_warn" => "每序列上下文 = 總量 ÷ 並行數".to_string(),
             "server_start_cmd" => "啟動命令:".to_string(),
+            // ===== GPU分配 =====
+            "gpu_allocation" => "GPU分配".to_string(),
+            "split_mode" => "分割模式:".to_string(),
+            "split_none" => "無（單GPU）".to_string(),
+            "split_layer" => "按層（預設）".to_string(),
+            "split_row" => "按行".to_string(),
+            "tensor_split" => "張量分割:".to_string(),
+            "tensor_split_hint" => "如 3,1 表示雙卡比例".to_string(),
+            "main_gpu" => "主GPU:".to_string(),
+            "cpu_moe" => "MoE留在CPU".to_string(),
+            "n_cpu_moe" => "MoE CPU層數:".to_string(),
+            "device" => "裝置:".to_string(),
+            // ===== RoPE =====
+            "rope_settings" => "RoPE設定".to_string(),
+            "rope_scaling" => "RoPE縮放:".to_string(),
+            "rope_scale" => "縮放因子:".to_string(),
+            "rope_freq_base" => "頻率基數:".to_string(),
+            "rope_freq_scale" => "頻率縮放:".to_string(),
+            "yarn_orig_ctx" => "YaRN原始上下文:".to_string(),
+            "rope_hint" => "0 = 使用模型預設值".to_string(),
+            // ===== 記憶體 =====
+            "memory_settings" => "記憶體".to_string(),
+            "mlock" => "鎖定記憶體(mlock)".to_string(),
+            "no_mmap" => "停用mmap".to_string(),
+            "numa" => "NUMA:".to_string(),
+            "numa_disabled" => "停用".to_string(),
+            "numa_distribute" => "均勻分佈".to_string(),
+            "numa_isolate" => "隔離".to_string(),
+            "numa_numactl" => "numactl".to_string(),
+            "override_tensor" => "覆蓋張量:".to_string(),
+            "override_tensor_hint" => "如 up=bf16".to_string(),
+            // ===== LoRA =====
+            "lora_settings" => "LoRA適配器".to_string(),
+            "lora_path" => "LoRA:".to_string(),
+            "lora_scaled" => "縮放LoRA:".to_string(),
+            "lora_hint" => "路徑:比例，如 lora.bin:0.5".to_string(),
+            // ===== 進階 =====
+            "advanced" => "進階選項".to_string(),
+            "api_key" => "API金鑰:".to_string(),
+            "timeout" => "逾時(秒):".to_string(),
+            "threads_http" => "HTTP執行緒:".to_string(),
+            "cache_prompt" => "提示快取".to_string(),
+            "context_shift" => "上下文移位".to_string(),
+            "metrics" => "指標端點".to_string(),
+            // ===== GPU自動適配 =====
+            "gpu_layers_hint" => "999 = 全部載入到GPU".to_string(),
+            "gpu_fit" => "自動適配顯存".to_string(),
+            "gpu_fit_desc" => "自動調整層數和ctx適配顯存".to_string(),
+            "fit_target" => "預留顯存(MiB):".to_string(),
+            "fit_ctx" => "最小上下文(fit):".to_string(),
+            "est_vram" => "預估顯存佔用".to_string(),
+            "auto_fit_on" => "自動適配已開啟，層數將自動計算".to_string(),
+            "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
         },
         Language::Japanese => match key {
@@ -412,6 +603,16 @@ fn t(lang: Language, key: &str) -> String {
             "ctx_size" => "コンテキストサイズ:".to_string(),
             "parallel_slots" => "並行スロット:".to_string(),
             "kv_cache" => "KVキャッシュ:".to_string(),
+            "kv_cache_k" => "Kキャッシュ:".to_string(),
+            "kv_cache_v" => "Vキャッシュ:".to_string(),
+            "gpu_offload" => "GPUオフロード:".to_string(),
+            "gpu_offload_gb" => "GPU読込(GB):".to_string(),
+            "gpu_vram_total" => "GPU VRAM:".to_string(),
+            "gpu_vram_used" => "モデル/キャッシュ推定:".to_string(),
+            "gpu_vram_free" => "空き推定:".to_string(),
+            "detect_gpu" => "GPU検出".to_string(),
+            "gpu_detected" => "検出済み:".to_string(),
+            "gpu_not_detected" => "GPU未検出".to_string(),
             "threads" => "スレッド数:".to_string(),
             "batch_threads" => "バッチスレッド:".to_string(),
             "batch_size" => "バッチサイズ:".to_string(),
@@ -496,6 +697,59 @@ fn t(lang: Language, key: &str) -> String {
             "cannot_delete_last" => "最後のプリセットは削除できません".to_string(),
             "ctx_per_seq_warn" => "シーケンスあたりctx = 合計 ÷ パラレル".to_string(),
             "server_start_cmd" => "起動コマンド:".to_string(),
+            // ===== GPU割り当て =====
+            "gpu_allocation" => "GPU割り当て".to_string(),
+            "split_mode" => "分割モード:".to_string(),
+            "split_none" => "なし（シングルGPU）".to_string(),
+            "split_layer" => "レイヤー（デフォルト）".to_string(),
+            "split_row" => "行".to_string(),
+            "tensor_split" => "テンソル分割:".to_string(),
+            "tensor_split_hint" => "例: 3,1（2GPU比率）".to_string(),
+            "main_gpu" => "メインGPU:".to_string(),
+            "cpu_moe" => "MoEをCPUに".to_string(),
+            "n_cpu_moe" => "MoE CPU層数:".to_string(),
+            "device" => "デバイス:".to_string(),
+            // ===== RoPE =====
+            "rope_settings" => "RoPE設定".to_string(),
+            "rope_scaling" => "RoPEスケーリング:".to_string(),
+            "rope_scale" => "スケール係数:".to_string(),
+            "rope_freq_base" => "周波数ベース:".to_string(),
+            "rope_freq_scale" => "周波数スケール:".to_string(),
+            "yarn_orig_ctx" => "YaRNオリジナルCtx:".to_string(),
+            "rope_hint" => "0 = モデルデフォルト".to_string(),
+            // ===== メモリ =====
+            "memory_settings" => "メモリ".to_string(),
+            "mlock" => "メモリをロック(mlock)".to_string(),
+            "no_mmap" => "mmapを無効化".to_string(),
+            "numa" => "NUMA:".to_string(),
+            "numa_disabled" => "無効".to_string(),
+            "numa_distribute" => "分散".to_string(),
+            "numa_isolate" => "隔離".to_string(),
+            "numa_numactl" => "numactl".to_string(),
+            "override_tensor" => "テンソル上書き:".to_string(),
+            "override_tensor_hint" => "例: up=bf16".to_string(),
+            // ===== LoRA =====
+            "lora_settings" => "LoRAアダプタ".to_string(),
+            "lora_path" => "LoRA:".to_string(),
+            "lora_scaled" => "スケールLoRA:".to_string(),
+            "lora_hint" => "パス:スケール、例 lora.bin:0.5".to_string(),
+            // ===== 詳細設定 =====
+            "advanced" => "詳細設定".to_string(),
+            "api_key" => "APIキー:".to_string(),
+            "timeout" => "タイムアウト(秒):".to_string(),
+            "threads_http" => "HTTPスレッド:".to_string(),
+            "cache_prompt" => "プロンプトキャッシュ".to_string(),
+            "context_shift" => "コンテキストシフト".to_string(),
+            "metrics" => "メトリクスエンドポイント".to_string(),
+            // ===== GPU自動適配 =====
+            "gpu_layers_hint" => "999 = すべてGPUへ".to_string(),
+            "gpu_fit" => "VRAM自動適配".to_string(),
+            "gpu_fit_desc" => "VRAMに合わせてレイヤー数とctxを自動調整".to_string(),
+            "fit_target" => "予約VRAM(MiB):".to_string(),
+            "fit_ctx" => "最小Ctx(fit):".to_string(),
+            "est_vram" => "推定VRAM使用量".to_string(),
+            "auto_fit_on" => "自動適配オン、レイヤー数は自動計算".to_string(),
+            "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
         },
         Language::Korean => match key {
@@ -512,6 +766,16 @@ fn t(lang: Language, key: &str) -> String {
             "ctx_size" => "컨텍스트 크기:".to_string(),
             "parallel_slots" => "병렬 슬롯:".to_string(),
             "kv_cache" => "KV 캐시:".to_string(),
+            "kv_cache_k" => "K 캐시:".to_string(),
+            "kv_cache_v" => "V 캐시:".to_string(),
+            "gpu_offload" => "GPU 오프로드:".to_string(),
+            "gpu_offload_gb" => "GPU 로드(GB):".to_string(),
+            "gpu_vram_total" => "GPU VRAM:".to_string(),
+            "gpu_vram_used" => "모델/캐시 예상:".to_string(),
+            "gpu_vram_free" => "여유 예상:".to_string(),
+            "detect_gpu" => "GPU 감지".to_string(),
+            "gpu_detected" => "감지됨:".to_string(),
+            "gpu_not_detected" => "GPU 미감지".to_string(),
             "threads" => "스레드 수:".to_string(),
             "batch_threads" => "배치 스레드:".to_string(),
             "batch_size" => "배치 크기:".to_string(),
@@ -596,6 +860,59 @@ fn t(lang: Language, key: &str) -> String {
             "cannot_delete_last" => "마지막 프리셋은 삭제할 수 없습니다".to_string(),
             "ctx_per_seq_warn" => "시퀀스당 ctx = 합계 ÷ 병렬".to_string(),
             "server_start_cmd" => "시작 명령:".to_string(),
+            // ===== GPU 할당 =====
+            "gpu_allocation" => "GPU 할당".to_string(),
+            "split_mode" => "분할 모드:".to_string(),
+            "split_none" => "없음 (단일 GPU)".to_string(),
+            "split_layer" => "레이어 (기본값)".to_string(),
+            "split_row" => "행".to_string(),
+            "tensor_split" => "텐서 분할:".to_string(),
+            "tensor_split_hint" => "예: 3,1 (2GPU 비율)".to_string(),
+            "main_gpu" => "메인 GPU:".to_string(),
+            "cpu_moe" => "MoE를 CPU에".to_string(),
+            "n_cpu_moe" => "MoE CPU 레이어:".to_string(),
+            "device" => "장치:".to_string(),
+            // ===== RoPE =====
+            "rope_settings" => "RoPE 설정".to_string(),
+            "rope_scaling" => "RoPE 스케일링:".to_string(),
+            "rope_scale" => "스케일 팩터:".to_string(),
+            "rope_freq_base" => "주파수 베이스:".to_string(),
+            "rope_freq_scale" => "주파수 스케일:".to_string(),
+            "yarn_orig_ctx" => "YaRN 원본 Ctx:".to_string(),
+            "rope_hint" => "0 = 모델 기본값".to_string(),
+            // ===== 메모리 =====
+            "memory_settings" => "메모리".to_string(),
+            "mlock" => "메모리 잠금(mlock)".to_string(),
+            "no_mmap" => "mmap 비활성화".to_string(),
+            "numa" => "NUMA:".to_string(),
+            "numa_disabled" => "비활성화".to_string(),
+            "numa_distribute" => "분산".to_string(),
+            "numa_isolate" => "격리".to_string(),
+            "numa_numactl" => "numactl".to_string(),
+            "override_tensor" => "텐서 재정의:".to_string(),
+            "override_tensor_hint" => "예: up=bf16".to_string(),
+            // ===== LoRA =====
+            "lora_settings" => "LoRA 어댑터".to_string(),
+            "lora_path" => "LoRA:".to_string(),
+            "lora_scaled" => "스케일 LoRA:".to_string(),
+            "lora_hint" => "경로:스케일, 예 lora.bin:0.5".to_string(),
+            // ===== 고급 =====
+            "advanced" => "고급 옵션".to_string(),
+            "api_key" => "API 키:".to_string(),
+            "timeout" => "타임아웃(초):".to_string(),
+            "threads_http" => "HTTP 스레드:".to_string(),
+            "cache_prompt" => "프롬프트 캐시".to_string(),
+            "context_shift" => "컨텍스트 시프트".to_string(),
+            "metrics" => "메트릭 엔드포인트".to_string(),
+            // ===== GPU 자동 맞춤 =====
+            "gpu_layers_hint" => "999 = 모든 레이어를 GPU로".to_string(),
+            "gpu_fit" => "VRAM 자동 맞춤".to_string(),
+            "gpu_fit_desc" => "VRAM에 맞게 레이어 수와 ctx 자동 조정".to_string(),
+            "fit_target" => "예약 VRAM(MiB):".to_string(),
+            "fit_ctx" => "최소 Ctx(fit):".to_string(),
+            "est_vram" => "예상 VRAM 사용량".to_string(),
+            "auto_fit_on" => "자동 맞춤 활성화, 레이어 수 자동 계산".to_string(),
+            "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
         },
     }
@@ -798,25 +1115,66 @@ impl Preset {
 
 // ==================== 数据结构 ====================
 
+fn default_kv_k() -> String { "f16".to_string() }
+fn default_kv_v() -> String { "f16".to_string() }
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct LaunchConfig {
+    // ===== 模型与服务器 =====
     model_path: String,
     llama_server_path: String,
+    mmproj_path: String,
+    // ===== 网络 =====
     host: String,
     port: u16,
-    n_gpu_layers: i32,
-    ctx_size: i32,
-    threads: i32,
-    threads_batch: i32,
-    batch_size: i32,
-    ubatch_size: i32,
-    flash_attn: bool,
-    kv_cache_type: String,
-    verbose: bool,
-    warmup: bool,
-    continuous_batching: bool,
-    n_parallel: i32,
-    mmproj_path: String,
+    api_key: String,               // --api-key
+    timeout: i32,                  // --timeout (秒)
+    // ===== GPU 与内存 =====
+    n_gpu_layers: i32,             // --n-gpu-layers
+    split_mode: String,            // --split-mode (none/layer/row)
+    tensor_split: String,          // --tensor-split (如 "3,1")
+    main_gpu: i32,                 // --main-gpu
+    ctx_size: i32,                 // --ctx-size
+    n_parallel: i32,               // --parallel
+    #[serde(default = "default_kv_k")]
+    kv_cache_type_k: String,       // --cache-type-k
+    #[serde(default = "default_kv_v")]
+    kv_cache_type_v: String,       // --cache-type-v
+    #[serde(default)]
+    gpu_vram_total: f32,           // GPU总显存(GB)，用于UI显示，0=未检测
+    mlock: bool,                   // --mlock
+    no_mmap: bool,                 // --no-mmap
+    numa: String,                  // --numa (空/distribute/isolate/numactl)
+    override_tensor: String,       // --override-tensor (如 "up=bf16")
+    cpu_moe: bool,                 // --cpu-moe
+    n_cpu_moe: i32,                // --n-cpu-moe
+    gpu_fit: bool,                 // --fit on (自动适配GPU显存)
+    fit_target: i32,               // --fit-target MiB (预留显存，默认1024)
+    fit_ctx: i32,                  // --fit-ctx (fit时最小ctx，默认4096)
+    // ===== 性能 =====
+    threads: i32,                  // --threads
+    threads_batch: i32,            // --threads-batch
+    threads_http: i32,             // --threads-http
+    batch_size: i32,               // --batch-size
+    ubatch_size: i32,              // --ubatch-size
+    // ===== 选项 =====
+    flash_attn: bool,              // --flash-attn
+    verbose: bool,                 // --verbose
+    warmup: bool,                  // --warmup
+    continuous_batching: bool,     // --cont-batching
+    cache_prompt: bool,            // --cache-prompt
+    context_shift: bool,           // --context-shift
+    metrics: bool,                 // --metrics
+    // ===== RoPE =====
+    rope_scaling: String,          // --rope-scaling (空/none/linear/yarn)
+    rope_scale: f32,               // --rope-scale
+    rope_freq_base: f32,           // --rope-freq-base (0=使用模型默认)
+    rope_freq_scale: f32,          // --rope-freq-scale (0=使用模型默认)
+    yarn_orig_ctx: i32,            // --yarn-orig-ctx
+    // ===== LoRA =====
+    lora_path: String,             // --lora
+    lora_scaled_path: String,      // --lora-scaled (路径:比例)
+    // ===== 思考模式 =====
     /// "on" | "off" | "auto" — controls --reasoning flag
     reasoning_mode: String,
 }
@@ -826,21 +1184,48 @@ impl Default for LaunchConfig {
         Self {
             model_path: r"H:\AI\models\model.gguf".to_string(),
             llama_server_path: r"H:\AI\llama.cpp\llama-server.exe".to_string(),
+            mmproj_path: String::new(),
             host: "127.0.0.1".to_string(),
             port: 8080,
+            api_key: String::new(),
+            timeout: 600,
             n_gpu_layers: 999,
+            split_mode: "layer".to_string(),
+            tensor_split: String::new(),
+            main_gpu: 0,
             ctx_size: 4096,
+            n_parallel: 1,
+            kv_cache_type_k: "f16".to_string(),
+            kv_cache_type_v: "f16".to_string(),
+            gpu_vram_total: 0.0,
+            mlock: false,
+            no_mmap: false,
+            numa: String::new(),
+            override_tensor: String::new(),
+            cpu_moe: false,
+            n_cpu_moe: 0,
+            gpu_fit: false,          // 默认关闭，手动控制GPU层数
+            fit_target: 1024,        // 预留1GB显存
+            fit_ctx: 4096,           // fit时最小ctx
             threads: 8,
             threads_batch: 8,
+            threads_http: -1,
             batch_size: 2048,
             ubatch_size: 512,
             flash_attn: true,
-            kv_cache_type: "f16".to_string(),
             verbose: false,
             warmup: true,
             continuous_batching: true,
-            n_parallel: 1,
-            mmproj_path: String::new(),
+            cache_prompt: true,
+            context_shift: false,
+            metrics: false,
+            rope_scaling: String::new(),
+            rope_scale: 1.0,
+            rope_freq_base: 0.0,
+            rope_freq_scale: 0.0,
+            yarn_orig_ctx: 0,
+            lora_path: String::new(),
+            lora_scaled_path: String::new(),
             reasoning_mode: "auto".to_string(),
         }
     }
@@ -922,6 +1307,15 @@ impl QuickCommand {
 
 // ==================== 主应用 ====================
 
+/// 思考模式支持等级 — 用于UI显示不同状态
+#[derive(Clone, Copy, PartialEq)]
+enum ThinkingSupport {
+    Supported,      // ✅ 完全支持（Qwen3/3.5/QwQ, DeepSeek R1 等）
+    Experimental,   // ⚠️ 实验性/有bug（Gemma 4 关闭不了）
+    NotCapable,     // ❌ 模型本身没有思考功能（LLaMA, Phi, Mistral等）
+    Unknown,        // ❓ 未知模型，可尝试
+}
+
 struct DeveLlamaGUI {
     launch_config: LaunchConfig,
     runtime_params: RuntimeParams,
@@ -947,6 +1341,8 @@ struct DeveLlamaGUI {
     server_start_time: Option<std::time::Instant>, // 服务器启动时间，用于延迟验证
     ctx_verified: bool, // ctx_size是否已通过/props验证
     ctx_mismatch_warned: bool, // 是否已警告ctx_size不匹配
+    gpu_vram_total: f32,           // 检测到的GPU总显存(GB)，0=未检测
+    gpu_vram_detected: bool,       // 是否已尝试检测
 }
 
 impl DeveLlamaGUI {
@@ -1042,6 +1438,8 @@ impl DeveLlamaGUI {
             server_start_time: None,
             ctx_verified: false,
             ctx_mismatch_warned: false,
+            gpu_vram_total: 0.0,
+            gpu_vram_detected: false,
         };
         gui.update_command_preview();
         gui
@@ -1090,6 +1488,58 @@ impl DeveLlamaGUI {
             .and_then(|s| s.to_str())
             .unwrap_or("Unknown Model")
             .to_string()
+    }
+
+    /// 检测当前模型对思考模式的支持等级
+    fn thinking_support(&self) -> ThinkingSupport {
+        let name = self.get_model_name().to_lowercase();
+        // ✅ 完全支持 — llama.cpp 已确认可以正确开关思考
+        let supported = [
+            "qwen3", "qwen3.", "qwq",                    // 阿里巴巴 Qwen 系列
+            "deepseek-r1", "deepseek-r.",                 // DeepSeek R1 系列
+            "deepseek-r1-distill",                         // DeepSeek 蒸馏版
+            "command-r7b",                                 // Cohere Command
+        ];
+        // ⚠️ 实验性 — llama.cpp 支持但关闭思考有已知bug
+        let experimental = [
+            "gemma-4", "gemma4",                          // Gemma 4: GitHub #21338 关闭不了
+            "gemma-3",                                    // Gemma 3: 部分支持
+            "kimi-k2-thinking", "kimi-k2.6",             // Kimi K2: 待验证
+            "bailing-think",                              // 百灵思考版
+            "glm-5",                                      // 智谱 GLM-5
+        ];
+        // ❌ 明确没有思考功能的模型
+        let not_thinking = [
+            "llama", "llama-2", "llama-3", "llama-4",
+            "mistral", "mixtral",
+            "phi-2", "phi-3", "phi-4",
+            "yi-",
+            "solar", "stablelm",
+            "falcon",
+        ];
+
+        for kw in &supported { if name.contains(kw) { return ThinkingSupport::Supported; } }
+        for kw in &experimental { if name.contains(kw) { return ThinkingSupport::Experimental; } }
+        for kw in &not_thinking { if name.contains(kw) { return ThinkingSupport::NotCapable; } }
+        ThinkingSupport::Unknown
+    }
+
+    /// 获取模型系列名称（用于显示）
+    fn get_model_family(&self) -> &'static str {
+        let name = self.get_model_name().to_lowercase();
+        if name.contains("qwen3") || name.contains("qwq") { return "Qwen3/QwQ"; }
+        if name.contains("deepseek-r1") || name.contains("deepseek-r.") { return "DeepSeek R1"; }
+        if name.contains("kimi") { return "Kimi K2"; }
+        if name.contains("gemma-4") || name.contains("gemma4") { return "Gemma 4"; }
+        if name.contains("gemma-3") { return "Gemma 3"; }
+        if name.contains("command-r7b") { return "Command R7B"; }
+        if name.contains("bailing") { return "Bailing"; }
+        if name.contains("deepseek") { return "DeepSeek"; }
+        if name.contains("llama") { return "LLaMA"; }
+        if name.contains("mistral") || name.contains("mixtral") { return "Mistral"; }
+        if name.contains("phi") { return "Phi"; }
+        if name.contains("yi") { return "Yi"; }
+        "Unknown"
     }
 
     fn apply_preset(&mut self, index: usize) {
@@ -1233,21 +1683,52 @@ impl DeveLlamaGUI {
             config.n_gpu_layers, config.ctx_size, config.threads, config.threads_batch,
             config.batch_size, config.ubatch_size
         );
+        // GPU 分配
+        if config.split_mode != "layer" { cmd.push_str(&format!(" ^\n  --split-mode {}", config.split_mode)); }
+        if !config.tensor_split.is_empty() { cmd.push_str(&format!(" ^\n  --tensor-split {}", config.tensor_split)); }
+        if config.main_gpu != 0 { cmd.push_str(&format!(" ^\n  --main-gpu {}", config.main_gpu)); }
+        if config.cpu_moe { cmd.push_str(" ^\n  --cpu-moe"); }
+        if config.n_cpu_moe > 0 { cmd.push_str(&format!(" ^\n  --n-cpu-moe {}", config.n_cpu_moe)); }
+        // GPU自动适配 (--fit: 自动调整层数和ctx适配显存)
+        if config.gpu_fit {
+            cmd.push_str(" ^\n  --fit on");
+            if config.fit_target != 1024 { cmd.push_str(&format!(" ^\n  --fit-target {}", config.fit_target)); }
+            if config.fit_ctx != 4096 { cmd.push_str(&format!(" ^\n  --fit-ctx {}", config.fit_ctx)); }
+        }
+        // KV缓存
+        cmd.push_str(&format!(" ^\n  --cache-type-k {}", config.kv_cache_type_k));
+        cmd.push_str(&format!(" ^\n  --cache-type-v {}", config.kv_cache_type_v));
+        // 并行
+        cmd.push_str(&format!(" ^\n  --parallel {}", config.n_parallel));
+        // 选项
         if config.flash_attn { cmd.push_str(" ^\n  --flash-attn on"); }
-        // 始终传递KV缓存类型
-        cmd.push_str(&format!(" ^\n  --cache-type-k {}", config.kv_cache_type));
-        cmd.push_str(&format!(" ^\n  --cache-type-v {}", config.kv_cache_type));
         if config.verbose { cmd.push_str(" ^\n  --verbose"); }
         if !config.warmup { cmd.push_str(" ^\n  --no-warmup"); }
         if !config.continuous_batching { cmd.push_str(" ^\n  --no-cont-batching"); }
-        // 始终传递parallel参数
-        cmd.push_str(&format!(" ^\n  --parallel {}", config.n_parallel));
+        if !config.cache_prompt { cmd.push_str(" ^\n  --no-cache-prompt"); }
+        if config.context_shift { cmd.push_str(" ^\n  --context-shift"); }
+        if config.metrics { cmd.push_str(" ^\n  --metrics"); }
+        // 内存
+        if config.mlock { cmd.push_str(" ^\n  --mlock"); }
+        if config.no_mmap { cmd.push_str(" ^\n  --no-mmap"); }
+        if !config.numa.is_empty() { cmd.push_str(&format!(" ^\n  --numa {}", config.numa)); }
+        if !config.override_tensor.is_empty() { cmd.push_str(&format!(" ^\n  --override-tensor {}", config.override_tensor)); }
+        // HTTP
+        if config.threads_http > 0 { cmd.push_str(&format!(" ^\n  --threads-http {}", config.threads_http)); }
+        if config.timeout != 600 { cmd.push_str(&format!(" ^\n  --timeout {}", config.timeout)); }
+        if !config.api_key.is_empty() { cmd.push_str(&format!(" ^\n  --api-key {}", config.api_key)); }
+        // MMProj
         if !config.mmproj_path.is_empty() { cmd.push_str(&format!(" ^\n  --mmproj \"{}\"", config.mmproj_path)); }
-        // 思考模式：on/off/auto
-        // off 时三管齐下确保 Qwen3/3.5 等模型真正关闭 thinking：
-        //   1) --reasoning off: 服务端不处理 reasoning
-        //   2) --chat-template-kwargs '{"enable_thinking":false}': Jinja 模板层面关闭
-        //   3) --reasoning-budget 0: 思考预算设为 0，立即终止
+        // RoPE
+        if !config.rope_scaling.is_empty() { cmd.push_str(&format!(" ^\n  --rope-scaling {}", config.rope_scaling)); }
+        if config.rope_scale != 1.0 { cmd.push_str(&format!(" ^\n  --rope-scale {}", config.rope_scale)); }
+        if config.rope_freq_base > 0.0 { cmd.push_str(&format!(" ^\n  --rope-freq-base {}", config.rope_freq_base)); }
+        if config.rope_freq_scale > 0.0 { cmd.push_str(&format!(" ^\n  --rope-freq-scale {}", config.rope_freq_scale)); }
+        if config.yarn_orig_ctx > 0 { cmd.push_str(&format!(" ^\n  --yarn-orig-ctx {}", config.yarn_orig_ctx)); }
+        // LoRA
+        if !config.lora_path.is_empty() { cmd.push_str(&format!(" ^\n  --lora \"{}\"", config.lora_path)); }
+        if !config.lora_scaled_path.is_empty() { cmd.push_str(&format!(" ^\n  --lora-scaled {}", config.lora_scaled_path)); }
+        // 思考模式
         match config.reasoning_mode.as_str() {
             "off" => {
                 cmd.push_str(" ^\n  --reasoning off");
@@ -1257,7 +1738,7 @@ impl DeveLlamaGUI {
             "on" => {
                 cmd.push_str(" ^\n  --reasoning on");
             }
-            _ => {} // auto: 不传参数，使用 llama-server 默认行为
+            _ => {}
         }
         cmd.push_str(" ^\n  --props");
         cmd
@@ -1290,17 +1771,52 @@ impl DeveLlamaGUI {
             .arg("--batch-size").arg(config.batch_size.to_string())
             .arg("--ubatch-size").arg(config.ubatch_size.to_string());
 
+        // GPU 分配
+        if config.split_mode != "layer" { cmd.arg("--split-mode").arg(&config.split_mode); }
+        if !config.tensor_split.is_empty() { cmd.arg("--tensor-split").arg(&config.tensor_split); }
+        if config.main_gpu != 0 { cmd.arg("--main-gpu").arg(config.main_gpu.to_string()); }
+        if config.cpu_moe { cmd.arg("--cpu-moe"); }
+        if config.n_cpu_moe > 0 { cmd.arg("--n-cpu-moe").arg(config.n_cpu_moe.to_string()); }
+        // GPU自动适配
+        if config.gpu_fit {
+            cmd.arg("--fit").arg("on");
+            if config.fit_target != 1024 { cmd.arg("--fit-target").arg(config.fit_target.to_string()); }
+            if config.fit_ctx != 4096 { cmd.arg("--fit-ctx").arg(config.fit_ctx.to_string()); }
+        }
+        // KV缓存
+        cmd.arg("--cache-type-k").arg(&config.kv_cache_type_k);
+        cmd.arg("--cache-type-v").arg(&config.kv_cache_type_v);
+        // 并行
+        cmd.arg("--parallel").arg(config.n_parallel.to_string());
+        // 选项
         if config.flash_attn { cmd.arg("--flash-attn").arg("on"); }
-        // 始终传递KV缓存类型，确保llama-server使用正确的缓存格式
-        cmd.arg("--cache-type-k").arg(&config.kv_cache_type);
-        cmd.arg("--cache-type-v").arg(&config.kv_cache_type);
         if config.verbose { cmd.arg("--verbose"); }
         if !config.warmup { cmd.arg("--no-warmup"); }
         if !config.continuous_batching { cmd.arg("--no-cont-batching"); }
-        // 始终传递--parallel参数，让用户清楚parallel和ctx-size的关系
-        cmd.arg("--parallel").arg(config.n_parallel.to_string());
+        if !config.cache_prompt { cmd.arg("--no-cache-prompt"); }
+        if config.context_shift { cmd.arg("--context-shift"); }
+        if config.metrics { cmd.arg("--metrics"); }
+        // 内存
+        if config.mlock { cmd.arg("--mlock"); }
+        if config.no_mmap { cmd.arg("--no-mmap"); }
+        if !config.numa.is_empty() { cmd.arg("--numa").arg(&config.numa); }
+        if !config.override_tensor.is_empty() { cmd.arg("--override-tensor").arg(&config.override_tensor); }
+        // HTTP
+        if config.threads_http > 0 { cmd.arg("--threads-http").arg(config.threads_http.to_string()); }
+        if config.timeout != 600 { cmd.arg("--timeout").arg(config.timeout.to_string()); }
+        if !config.api_key.is_empty() { cmd.arg("--api-key").arg(&config.api_key); }
+        // MMProj
         if !config.mmproj_path.is_empty() { cmd.arg("--mmproj").arg(&config.mmproj_path); }
-        // 思考模式：off 时三管齐下确保 Qwen3/3.5 等模型真正关闭 thinking
+        // RoPE
+        if !config.rope_scaling.is_empty() { cmd.arg("--rope-scaling").arg(&config.rope_scaling); }
+        if config.rope_scale != 1.0 { cmd.arg("--rope-scale").arg(config.rope_scale.to_string()); }
+        if config.rope_freq_base > 0.0 { cmd.arg("--rope-freq-base").arg(config.rope_freq_base.to_string()); }
+        if config.rope_freq_scale > 0.0 { cmd.arg("--rope-freq-scale").arg(config.rope_freq_scale.to_string()); }
+        if config.yarn_orig_ctx > 0 { cmd.arg("--yarn-orig-ctx").arg(config.yarn_orig_ctx.to_string()); }
+        // LoRA
+        if !config.lora_path.is_empty() { cmd.arg("--lora").arg(&config.lora_path); }
+        if !config.lora_scaled_path.is_empty() { cmd.arg("--lora-scaled").arg(&config.lora_scaled_path); }
+        // 思考模式
         match config.reasoning_mode.as_str() {
             "off" => {
                 cmd.arg("--reasoning").arg("off");
@@ -1312,7 +1828,7 @@ impl DeveLlamaGUI {
             }
             _ => {} // auto: 不传参数
         }
-        // 启用props API端点，允许通过GET /props查看运行时属性
+        // 启用props API端点
         cmd.arg("--props");
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -1454,6 +1970,30 @@ impl DeveLlamaGUI {
         } else {
             self.params_apply_status = t(lang, "params_saved").to_string();
             self.logs.push(t(lang, "params_saved").to_string());
+        }
+    }
+
+    /// 检测GPU总显存(GB)，通过nvidia-smi
+    fn detect_gpu_vram() -> f32 {
+        let output = std::process::Command::new("nvidia-smi")
+            .args(["--query-gpu=memory.total", "--format=csv,noheader,nounits"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
+        match output {
+            Ok(out) if out.status.success() => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                // 输出格式: "8192\n" 或 "8192 MiB\n" 或多GPU "8192\n4096\n"
+                if let Some(first_line) = stdout.lines().next() {
+                    let trimmed = first_line.trim();
+                    // 去掉可能的 " MiB" 后缀
+                    let mib_str = trimmed.split_whitespace().next().unwrap_or("0");
+                    if let Ok(mib) = mib_str.parse::<f32>() {
+                        return mib / 1024.0; // MiB -> GB
+                    }
+                }
+                0.0
+            }
+            _ => 0.0, // nvidia-smi不可用或失败
         }
     }
 
@@ -1745,7 +2285,19 @@ impl eframe::App for DeveLlamaGUI {
                     ui.monospace(egui::RichText::new(&self.api_url).size(12.0).color(accent));
                     ui.separator();
 
-                    // 思考模式下拉框
+                    // 思考模式：始终显示，根据模型支持等级用不同颜色标注
+                    let support = self.thinking_support();
+                    let model_family = self.get_model_family();
+
+                    // 状态图标和颜色
+                    let (status_icon, status_color) = match support {
+                        ThinkingSupport::Supported => ("✅", success),
+                        ThinkingSupport::Experimental => ("⚠️", egui::Color32::YELLOW),
+                        ThinkingSupport::NotCapable => ("—", egui::Color32::GRAY),
+                        ThinkingSupport::Unknown => ("❓", egui::Color32::from_rgb(180, 180, 180)),
+                    };
+
+                    // 始终显示下拉框
                     let modes = [
                         t(lang, "thinking_auto"),
                         t(lang, "thinking_on"),
@@ -1774,7 +2326,39 @@ impl eframe::App for DeveLlamaGUI {
                         self.launch_config.reasoning_mode = mode;
                         self.on_launch_param_changed();
                     }
-                    ui.label(egui::RichText::new(t(lang, "thinking_mode")).size(13.0));
+                    // 标签：状态图标 + 模型名称
+                    // ⚠️ Experimental（黄色）在浅色主题下加黑色阴影文字提升可读性
+                    let label_text = format!("{} {} {}", status_icon, t(lang, "thinking_mode"), model_family);
+                    if support == ThinkingSupport::Experimental {
+                        // 先画黑色阴影（稍大字号）
+                        let shadow_galley = ui.fonts(|f| f.layout_no_wrap(
+                            label_text.clone().into(),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::from_rgba_premultiplied(0, 0, 0, 120),
+                        ));
+                        let shadow_size = shadow_galley.size();
+                        let (rect, resp) = ui.allocate_exact_size(
+                            egui::vec2(shadow_size.x + 2.0, shadow_size.y + 1.0),
+                            egui::Sense::hover(),
+                        );
+                        // 画阴影层（偏移 1px）
+                        ui.painter().galley(
+                            egui::pos2(rect.min.x + 1.0, rect.min.y + 1.0),
+                            shadow_galley,
+                            egui::Color32::from_rgba_premultiplied(0, 0, 0, 120),
+                        );
+                        // 画主色层
+                        let main_galley = ui.fonts(|f| f.layout_no_wrap(
+                            label_text.into(),
+                            egui::FontId::proportional(13.0),
+                            status_color,
+                        ));
+                        ui.painter().galley(rect.min, main_galley, status_color);
+                        resp
+                    } else {
+                        ui.label(egui::RichText::new(label_text)
+                            .size(13.0).color(status_color))
+                    };
                 });
             });
         });
@@ -1913,20 +2497,148 @@ impl eframe::App for DeveLlamaGUI {
                                     });
                                 });
 
-                            egui::CollapsingHeader::new(egui::RichText::new(t(lang, "gpu_memory")).size(16.0).color(accent))
+                            // ===== GPU & 显存 =====
+                            // 区域名: "GPU & Memory (LM Studio: GPU Offload)"
+                            let gpu_title = format!("{} {}", t(lang, "gpu_memory"), t(lang, "gpu_offload_lmstudio"));
+                            egui::CollapsingHeader::new(egui::RichText::new(gpu_title).size(16.0).color(accent))
                                 .default_open(true)
                                 .show(ui, |ui| {
+                                    // --- GPU VRAM 检测 ---
+                                    ui.horizontal(|ui| {
+                                        if ui.button(t(lang, "detect_gpu")).clicked() {
+                                            self.gpu_vram_total = Self::detect_gpu_vram();
+                                            self.gpu_vram_detected = true;
+                                            self.launch_config.gpu_vram_total = self.gpu_vram_total;
+                                            self.save_config();
+                                        }
+                                        if self.gpu_vram_total > 0.0 {
+                                            ui.label(egui::RichText::new(
+                                                format!("{} {:.0} GB ({:.0} MiB)", t(lang, "gpu_detected"), self.gpu_vram_total, self.gpu_vram_total * 1024.0)
+                                            ).size(13.0).color(egui::Color32::from_rgb(100, 220, 100)));
+                                        } else if self.gpu_vram_detected {
+                                            ui.label(egui::RichText::new(t(lang, "gpu_not_detected")).size(12.0).color(egui::Color32::from_rgb(255, 120, 120)));
+                                        }
+                                    });
+                                    ui.add_space(2.0);
+
+                                    // --- 计算模型文件大小(用于GB换算) ---
+                                    let model_file_gb = {
+                                        let model_path = std::path::Path::new(&self.launch_config.model_path);
+                                        std::fs::metadata(&model_path).map(|m| m.len() as f32 / (1024.0*1024.0*1024.0)).unwrap_or(0.0)
+                                    };
+
+                                    // --- GPU Layers 滑块（主控制） ---
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "gpu_layers"));
                                         let sw = ui.available_width() - 50.0;
                                         if ui.add_sized([sw, 22.0], egui::Slider::new(&mut self.launch_config.n_gpu_layers, 0..=999)).changed() {
                                             self.on_launch_param_changed();
                                         }
-                                        if ui.button(t(lang, "max")).clicked() { 
-                                            self.launch_config.n_gpu_layers = 999; 
+                                        if ui.button(t(lang, "max")).clicked() {
+                                            self.launch_config.n_gpu_layers = 999;
                                             self.on_launch_param_changed();
                                         }
                                     });
+                                    ui.label(egui::RichText::new(t(lang, "gpu_layers_hint")).size(10.0).color(egui::Color32::GRAY));
+
+                                    // --- 估算GPU加载量（纯显示，基于层数） ---
+                                    if model_file_gb > 0.0 {
+                                        let layer_ratio = (self.launch_config.n_gpu_layers as f32).min(999.0) / 999.0;
+                                        let est_model_gb = model_file_gb * layer_ratio;
+                                        ui.label(egui::RichText::new(
+                                            format!("{} ≈ {:.1} GB (model {:.1}GB × {:.0}%)", t(lang, "gpu_offload_gb"), est_model_gb, model_file_gb, layer_ratio * 100.0)
+                                        ).size(11.0).color(egui::Color32::from_rgb(140, 200, 255)));
+                                    }
+
+                                    // --- Auto GPU Fit 开关 ---
+                                    ui.add_space(2.0);
+                                    if ui.checkbox(&mut self.launch_config.gpu_fit, t(lang, "gpu_fit")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    ui.label(egui::RichText::new(t(lang, "gpu_fit_desc")).size(10.0).color(egui::Color32::GRAY));
+                                    if self.launch_config.gpu_fit {
+                                        ui.horizontal(|ui| {
+                                            ui.label(t(lang, "fit_target"));
+                                            if ui.add(egui::DragValue::new(&mut self.launch_config.fit_target).speed(64).range(256..=8192)).changed() {
+                                                self.on_launch_param_changed();
+                                            }
+                                            ui.label("MiB");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label(t(lang, "fit_ctx"));
+                                            if ui.add(egui::DragValue::new(&mut self.launch_config.fit_ctx).speed(256).range(512..=131072)).changed() {
+                                                self.on_launch_param_changed();
+                                            }
+                                        });
+                                        ui.label(egui::RichText::new(t(lang, "auto_fit_on")).size(11.0).color(egui::Color32::GREEN));
+                                    }
+
+                                    // --- VRAM 使用情况可视化 ---
+                                    if self.gpu_vram_total > 0.0 && model_file_gb > 0.0 {
+                                        ui.add_space(4.0);
+                                        let layer_ratio_calc = (self.launch_config.n_gpu_layers as f64).min(999.0) / 999.0;
+                                        let est_model_gb = model_file_gb as f64 * layer_ratio_calc;
+                                        let kv_extra_gb = (self.launch_config.ctx_size as f64 * self.launch_config.n_parallel as f64 * 2.0 * 2.0) / (1024.0 * 1024.0 * 1024.0);
+                                        let total_est = est_model_gb + kv_extra_gb;
+                                        let vram_total = self.gpu_vram_total as f64;
+                                        let free_est = (vram_total - total_est).max(0.0);
+
+                                        // 颜色
+                                        let usage_color = if total_est > vram_total * 0.9 {
+                                            egui::Color32::from_rgb(255, 80, 80)
+                                        } else if total_est > vram_total * 0.7 {
+                                            egui::Color32::from_rgb(255, 200, 50)
+                                        } else {
+                                            egui::Color32::from_rgb(80, 200, 120)
+                                        };
+
+                                        // 进度条式VRAM使用可视化
+                                        let bar_height = 18.0;
+                                        let (rect, _) = ui.allocate_exact_size(
+                                            egui::vec2(ui.available_width(), bar_height + 20.0),
+                                            egui::Sense::hover(),
+                                        );
+                                        let painter = ui.painter();
+
+                                        // 背景条（总VRAM）
+                                        painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(60, 60, 60));
+                                        // 已用部分
+                                        let usage_ratio = (total_est / vram_total).min(1.0);
+                                        let usage_width = rect.width() * usage_ratio as f32;
+                                        painter.rect_filled(
+                                            egui::Rect::from_min_max(rect.min, egui::pos2(rect.min.x + usage_width, rect.max.y - 15.0)),
+                                            2.0, usage_color,
+                                        );
+                                        // 文字标签
+                                        painter.text(
+                                            rect.min + egui::vec2(4.0, 1.0),
+                                            egui::Align2::LEFT_TOP,
+                                            format!("{:.1} / {:.0} GB ({:.0}%)", total_est, vram_total, usage_ratio * 100.0),
+                                            egui::FontId::proportional(11.0),
+                                            egui::Color32::WHITE,
+                                        );
+                                        // 下方明细
+                                        painter.text(
+                                            egui::pos2(rect.min.x, rect.max.y - 13.0),
+                                            egui::Align2::LEFT_TOP,
+                                            format!("Model: {:.1}GB | KV Cache: {:.1}GB | Free: {:.1}GB", est_model_gb, kv_extra_gb, free_est),
+                                            egui::FontId::proportional(9.0),
+                                            egui::Color32::GRAY,
+                                        );
+                                    } else if model_file_gb > 0.0 {
+                                        // 没检测到VRAM但有模型文件，显示简单估算
+                                        let layer_ratio_calc = (self.launch_config.n_gpu_layers as f64).min(999.0) / 999.0;
+                                        let est_model_gb = model_file_gb as f64 * layer_ratio_calc;
+                                        let kv_extra_gb = (self.launch_config.ctx_size as f64 * self.launch_config.n_parallel as f64 * 2.0 * 2.0) / (1024.0 * 1024.0 * 1024.0);
+                                        let total_est = est_model_gb + kv_extra_gb;
+                                        let color = if total_est > 8.0 { egui::Color32::from_rgb(255, 120, 120) }
+                                                    else if total_est > 6.0 { egui::Color32::YELLOW }
+                                                    else { egui::Color32::from_rgb(120, 255, 120) };
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new(format!("{} ≈ {:.1} GB", t(lang, "est_vram"), total_est)).size(12.0).color(color));
+                                            ui.label(egui::RichText::new(format!("(model {:.1}GB × {:.0}% + KV {:.1}GB)", model_file_gb, layer_ratio_calc * 100.0, kv_extra_gb)).size(9.0).color(egui::Color32::GRAY));
+                                        });
+                                    }
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "ctx_size"));
                                         let sw = ui.available_width() - 90.0;
@@ -1950,18 +2662,124 @@ impl eframe::App for DeveLlamaGUI {
                                         }
                                     });
                                     ui.horizontal(|ui| {
-                                        ui.label(t(lang, "kv_cache"));
-                                        let kv_changed = egui::ComboBox::from_id_source("kv_cache").width(ui.available_width())
-                                            .selected_text(&self.launch_config.kv_cache_type)
+                                        ui.label(t(lang, "kv_cache_k"));
+                                        let kvk_changed = egui::ComboBox::from_id_source("kv_cache_k").width(65.0)
+                                            .selected_text(&self.launch_config.kv_cache_type_k)
                                             .show_ui(ui, |ui| {
                                                 for t in &["f16", "f32", "q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "bf16", "iq4_nl"] {
-                                                    ui.selectable_value(&mut self.launch_config.kv_cache_type, t.to_string(), *t);
+                                                    ui.selectable_value(&mut self.launch_config.kv_cache_type_k, t.to_string(), *t);
                                                 }
                                             }).inner.is_some();
-                                        if kv_changed {
+                                        if kvk_changed {
+                                            self.on_launch_param_changed();
+                                        }
+                                        ui.label(t(lang, "kv_cache_v"));
+                                        let kvv_changed = egui::ComboBox::from_id_source("kv_cache_v").width(65.0)
+                                            .selected_text(&self.launch_config.kv_cache_type_v)
+                                            .show_ui(ui, |ui| {
+                                                for t in &["f16", "f32", "q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "bf16", "iq4_nl"] {
+                                                    ui.selectable_value(&mut self.launch_config.kv_cache_type_v, t.to_string(), *t);
+                                                }
+                                            }).inner.is_some();
+                                        if kvv_changed {
                                             self.on_launch_param_changed();
                                         }
                                     });
+                                });
+
+                            // ===== GPU分配 =====
+                            egui::CollapsingHeader::new(egui::RichText::new(t(lang, "gpu_allocation")).size(16.0).color(accent))
+                                .default_open(false)
+                                .show(ui, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "split_mode"));
+                                        let sm_changed = egui::ComboBox::from_id_source("split_mode").width(ui.available_width())
+                                            .selected_text(match self.launch_config.split_mode.as_str() {
+                                                "none" => t(lang, "split_none"),
+                                                "row" => t(lang, "split_row"),
+                                                _ => t(lang, "split_layer"),
+                                            })
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(&mut self.launch_config.split_mode, "layer".to_string(), t(lang, "split_layer"));
+                                                ui.selectable_value(&mut self.launch_config.split_mode, "none".to_string(), t(lang, "split_none"));
+                                                ui.selectable_value(&mut self.launch_config.split_mode, "row".to_string(), t(lang, "split_row"));
+                                            }).inner.is_some();
+                                        if sm_changed { self.on_launch_param_changed(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "tensor_split"));
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.tensor_split)
+                                            .hint_text(t(lang, "tensor_split_hint"))
+                                            .desired_width(ui.available_width()));
+                                        if resp.changed() { self.on_launch_param_changed(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "main_gpu"));
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.main_gpu).speed(1).range(0..=15)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                    });
+                                    if ui.checkbox(&mut self.launch_config.cpu_moe, t(lang, "cpu_moe")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if self.launch_config.cpu_moe {
+                                        ui.horizontal(|ui| {
+                                            ui.label(t(lang, "n_cpu_moe"));
+                                            if ui.add(egui::DragValue::new(&mut self.launch_config.n_cpu_moe).speed(1).range(0..=128)).changed() {
+                                                self.on_launch_param_changed();
+                                            }
+                                        });
+                                    }
+                                });
+
+                            // ===== RoPE设置 =====
+                            egui::CollapsingHeader::new(egui::RichText::new(t(lang, "rope_settings")).size(16.0).color(accent))
+                                .default_open(false)
+                                .show(ui, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "rope_scaling"));
+                                        let rs_changed = egui::ComboBox::from_id_source("rope_scaling").width(ui.available_width())
+                                            .selected_text(if self.launch_config.rope_scaling.is_empty() {
+                                                t(lang, "numa_disabled")
+                                            } else {
+                                                self.launch_config.rope_scaling.clone().into()
+                                            })
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(&mut self.launch_config.rope_scaling, String::new(), t(lang, "numa_disabled"));
+                                                ui.selectable_value(&mut self.launch_config.rope_scaling, "none".to_string(), "none");
+                                                ui.selectable_value(&mut self.launch_config.rope_scaling, "linear".to_string(), "linear");
+                                                ui.selectable_value(&mut self.launch_config.rope_scaling, "yarn".to_string(), "yarn");
+                                            }).inner.is_some();
+                                        if rs_changed { self.on_launch_param_changed(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "rope_scale"));
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.rope_scale).speed(0.1).range(0.0..=100.0).max_decimals(2)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "rope_freq_base"));
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.rope_freq_base).speed(100.0).range(0.0..=1000000.0).max_decimals(0)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                        ui.label(egui::RichText::new(t(lang, "rope_hint")).size(10.0).color(egui::Color32::GRAY));
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "rope_freq_scale"));
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.rope_freq_scale).speed(0.01).range(0.0..=10.0).max_decimals(4)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                        ui.label(egui::RichText::new(t(lang, "rope_hint")).size(10.0).color(egui::Color32::GRAY));
+                                    });
+                                    if self.launch_config.rope_scaling == "yarn" {
+                                        ui.horizontal(|ui| {
+                                            ui.label(t(lang, "yarn_orig_ctx"));
+                                            if ui.add(egui::DragValue::new(&mut self.launch_config.yarn_orig_ctx).speed(512).range(0..=999999)).changed() {
+                                                self.on_launch_param_changed();
+                                            }
+                                        });
+                                    }
                                 });
                         });
                 });
@@ -2028,6 +2846,103 @@ impl eframe::App for DeveLlamaGUI {
                                     if ui.checkbox(&mut self.launch_config.verbose, t(lang, "verbose")).changed() {
                                         self.on_launch_param_changed();
                                     }
+                                    if ui.checkbox(&mut self.launch_config.cache_prompt, t(lang, "cache_prompt")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if ui.checkbox(&mut self.launch_config.context_shift, t(lang, "context_shift")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if ui.checkbox(&mut self.launch_config.metrics, t(lang, "metrics")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                });
+
+                            // ===== 内存 =====
+                            egui::CollapsingHeader::new(egui::RichText::new(t(lang, "memory_settings")).size(16.0).color(accent))
+                                .default_open(false)
+                                .show(ui, |ui| {
+                                    if ui.checkbox(&mut self.launch_config.mlock, t(lang, "mlock")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    if ui.checkbox(&mut self.launch_config.no_mmap, t(lang, "no_mmap")).changed() {
+                                        self.on_launch_param_changed();
+                                    }
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "numa"));
+                                        let numa_changed = egui::ComboBox::from_id_source("numa").width(ui.available_width())
+                                            .selected_text(if self.launch_config.numa.is_empty() {
+                                                t(lang, "numa_disabled")
+                                            } else {
+                                                self.launch_config.numa.clone().into()
+                                            })
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(&mut self.launch_config.numa, String::new(), t(lang, "numa_disabled"));
+                                                ui.selectable_value(&mut self.launch_config.numa, "distribute".to_string(), t(lang, "numa_distribute"));
+                                                ui.selectable_value(&mut self.launch_config.numa, "isolate".to_string(), t(lang, "numa_isolate"));
+                                                ui.selectable_value(&mut self.launch_config.numa, "numactl".to_string(), t(lang, "numa_numactl"));
+                                            }).inner.is_some();
+                                        if numa_changed { self.on_launch_param_changed(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "override_tensor"));
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.override_tensor)
+                                            .hint_text(t(lang, "override_tensor_hint"))
+                                            .desired_width(ui.available_width()));
+                                        if resp.changed() { self.on_launch_param_changed(); }
+                                    });
+                                });
+
+                            // ===== LoRA =====
+                            egui::CollapsingHeader::new(egui::RichText::new(t(lang, "lora_settings")).size(16.0).color(accent))
+                                .default_open(false)
+                                .show(ui, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "lora_path"));
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.lora_path)
+                                            .desired_width(ui.available_width() - 70.0));
+                                        if resp.changed() { self.on_launch_param_changed(); }
+                                        if ui.button(t(lang, "browse")).clicked() {
+                                            if let Some(path) = rfd::FileDialog::new()
+                                                .add_filter("LoRA", &["gguf", "bin", "safetensors"])
+                                                .pick_file()
+                                            {
+                                                self.launch_config.lora_path = path.to_string_lossy().to_string();
+                                                self.on_launch_param_changed();
+                                            }
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "lora_scaled"));
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.lora_scaled_path)
+                                            .hint_text(t(lang, "lora_hint"))
+                                            .desired_width(ui.available_width()));
+                                        if resp.changed() { self.on_launch_param_changed(); }
+                                    });
+                                });
+
+                            // ===== 高级选项 =====
+                            egui::CollapsingHeader::new(egui::RichText::new(t(lang, "advanced")).size(16.0).color(accent))
+                                .default_open(false)
+                                .show(ui, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "api_key"));
+                                        let resp = ui.add(egui::TextEdit::singleline(&mut self.launch_config.api_key)
+                                            .desired_width(ui.available_width())
+                                            .password(true));
+                                        if resp.changed() { self.on_launch_param_changed(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "timeout"));
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.timeout).speed(10).range(30..=3600)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(t(lang, "threads_http"));
+                                        if ui.add(egui::DragValue::new(&mut self.launch_config.threads_http).speed(1).range(-1..=32)).changed() {
+                                            self.on_launch_param_changed();
+                                        }
+                                    });
                                 });
                         });
                 });
