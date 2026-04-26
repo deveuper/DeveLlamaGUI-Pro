@@ -259,6 +259,10 @@ fn t(lang: Language, key: &str) -> String {
             "fit_target" => "Reserve VRAM (MiB):".to_string(),
             "fit_ctx" => "Min Ctx (fit):".to_string(),
             "est_vram" => "Est. VRAM usage".to_string(),
+            "speed_est" => "Est. speed".to_string(),
+            "cpu_layers_note" => "CPU offload".to_string(),
+            "speed_penalty" => "slower than full GPU".to_string(),
+            "cpu_only_warning" => "⚠ All layers on CPU — expect 5-15% of GPU speed".to_string(),
             "auto_fit_on" => "Auto-fit enabled, layers auto-calculated".to_string(),
             "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
@@ -422,6 +426,10 @@ fn t(lang: Language, key: &str) -> String {
             "fit_target" => "预留显存(MiB):".to_string(),
             "fit_ctx" => "最小上下文(fit):".to_string(),
             "est_vram" => "预估显存占用".to_string(),
+            "speed_est" => "预估速度".to_string(),
+            "cpu_layers_note" => "CPU卸载".to_string(),
+            "speed_penalty" => "比全GPU推理慢".to_string(),
+            "cpu_only_warning" => "⚠ 全部层级在CPU上 — 预计仅为GPU速度的5~15%".to_string(),
             "auto_fit_on" => "自动适配已开启，层数将自动计算".to_string(),
             "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
             _ => key.to_string(),
@@ -587,6 +595,10 @@ fn t(lang: Language, key: &str) -> String {
             "est_vram" => "預估顯存佔用".to_string(),
             "auto_fit_on" => "自動適配已開啟，層數將自動計算".to_string(),
             "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
+            "speed_est" => "預估速度".to_string(),
+            "cpu_layers_note" => "CPU層 (系統記憶體)".to_string(),
+            "speed_penalty" => "速度下降".to_string(),
+            "cpu_only_warning" => "⚠ 所有層都在CPU上運行，速度將非常慢！".to_string(),
             _ => key.to_string(),
         },
         Language::Japanese => match key {
@@ -750,6 +762,10 @@ fn t(lang: Language, key: &str) -> String {
             "est_vram" => "推定VRAM使用量".to_string(),
             "auto_fit_on" => "自動適配オン、レイヤー数は自動計算".to_string(),
             "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
+            "speed_est" => "推定速度".to_string(),
+            "cpu_layers_note" => "CPUレイヤー (システムメモリ)".to_string(),
+            "speed_penalty" => "速度低下".to_string(),
+            "cpu_only_warning" => "⚠ すべてのレイヤーがCPUで実行、非常に低速です！".to_string(),
             _ => key.to_string(),
         },
         Language::Korean => match key {
@@ -913,6 +929,10 @@ fn t(lang: Language, key: &str) -> String {
             "est_vram" => "예상 VRAM 사용량".to_string(),
             "auto_fit_on" => "자동 맞춤 활성화, 레이어 수 자동 계산".to_string(),
             "gpu_offload_lmstudio" => "(LM Studio: GPU Offload)".to_string(),
+            "speed_est" => "예상 속도".to_string(),
+            "cpu_layers_note" => "CPU 레이어 (시스템 메모리)".to_string(),
+            "speed_penalty" => "속도 저하".to_string(),
+            "cpu_only_warning" => "⚠ 모든 레이어가 CPU에서 실행, 매우 느립니다!".to_string(),
             _ => key.to_string(),
         },
     }
@@ -1343,6 +1363,8 @@ struct DeveLlamaGUI {
     ctx_mismatch_warned: bool, // 是否已警告ctx_size不匹配
     gpu_vram_total: f32,           // 检测到的GPU总显存(GB)，0=未检测
     gpu_vram_detected: bool,       // 是否已尝试检测
+    sys_ram_total: f32,            // 检测到的系统总内存(GB)，0=未检测
+    sys_ram_detected: bool,        // 是否已尝试检测系统内存
 }
 
 impl DeveLlamaGUI {
@@ -1440,6 +1462,8 @@ impl DeveLlamaGUI {
             ctx_mismatch_warned: false,
             gpu_vram_total: 0.0,
             gpu_vram_detected: false,
+            sys_ram_total: 0.0,
+            sys_ram_detected: false,
         };
         gui.update_command_preview();
         gui
@@ -1982,10 +2006,8 @@ impl DeveLlamaGUI {
         match output {
             Ok(out) if out.status.success() => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
-                // 输出格式: "8192\n" 或 "8192 MiB\n" 或多GPU "8192\n4096\n"
                 if let Some(first_line) = stdout.lines().next() {
                     let trimmed = first_line.trim();
-                    // 去掉可能的 " MiB" 后缀
                     let mib_str = trimmed.split_whitespace().next().unwrap_or("0");
                     if let Ok(mib) = mib_str.parse::<f32>() {
                         return mib / 1024.0; // MiB -> GB
@@ -1993,7 +2015,58 @@ impl DeveLlamaGUI {
                 }
                 0.0
             }
-            _ => 0.0, // nvidia-smi不可用或失败
+            _ => 0.0,
+        }
+    }
+
+    /// 检测系统总内存(GB)，通过wmic
+    fn detect_sys_ram() -> f32 {
+        let output = std::process::Command::new("wmic")
+            .args(["OS", "get", "TotalVisibleMemorySize", "/value"])
+            .creation_flags(0x08000000)
+            .output();
+        match output {
+            Ok(out) if out.status.success() => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                // 输出格式: "TotalVisibleMemorySize=16727680\n"
+                for line in stdout.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("TotalVisibleMemorySize=") {
+                        let kb_str = trimmed.split('=').nth(1).unwrap_or("0").trim();
+                        if let Ok(kb) = kb_str.parse::<f64>() {
+                            return (kb / (1024.0 * 1024.0)) as f32; // KB -> GB
+                        }
+                    }
+                }
+                0.0
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// 估算速度影响：GPU全加载 vs 部分CPU推理
+    /// 返回 (预估速度百分比相对全GPU, 速度描述)
+    /// 规则：基于社区benchmark数据
+    /// - 全GPU: 100%基准（如90 t/s）
+    /// - 混合推理: 速度受CPU瓶颈限制，约 (gpu_ratio * 0.7 + 0.3) 但有底线
+    /// - 全CPU: 约5-15%速度（DDR5更好，DDR4更慢）
+    fn estimate_speed_impact(gpu_layer_ratio: f32) -> (f32, &'static str) {
+        if gpu_layer_ratio >= 0.99 {
+            (100.0, "Full GPU speed")
+        } else if gpu_layer_ratio <= 0.01 {
+            (8.0, "CPU-only (slow)")
+        } else {
+            // 混合推理：线性近似但有惩罚
+            // 实际受CPU-GPU数据传输瓶颈影响，不是简单线性
+            let speed_pct = (gpu_layer_ratio * 85.0 + 8.0).min(95.0);
+            let desc = if speed_pct > 70.0 {
+                "Mostly GPU (fast)"
+            } else if speed_pct > 40.0 {
+                "Hybrid (moderate)"
+            } else {
+                "Mostly CPU (slow)"
+            };
+            (speed_pct, desc)
         }
     }
 
@@ -2509,6 +2582,9 @@ impl eframe::App for DeveLlamaGUI {
                                             self.gpu_vram_total = Self::detect_gpu_vram();
                                             self.gpu_vram_detected = true;
                                             self.launch_config.gpu_vram_total = self.gpu_vram_total;
+                                            // 同时检测系统内存
+                                            self.sys_ram_total = Self::detect_sys_ram();
+                                            self.sys_ram_detected = true;
                                             self.save_config();
                                         }
                                         if self.gpu_vram_total > 0.0 {
@@ -2573,71 +2649,164 @@ impl eframe::App for DeveLlamaGUI {
                                         ui.label(egui::RichText::new(t(lang, "auto_fit_on")).size(11.0).color(egui::Color32::GREEN));
                                     }
 
-                                    // --- VRAM 使用情况可视化 ---
-                                    if self.gpu_vram_total > 0.0 && model_file_gb > 0.0 {
+                                    // --- VRAM + RAM 双条可视化 + 速度估算 ---
+                                    if model_file_gb > 0.0 {
                                         ui.add_space(4.0);
-                                        let layer_ratio_calc = (self.launch_config.n_gpu_layers as f64).min(999.0) / 999.0;
-                                        let est_model_gb = model_file_gb as f64 * layer_ratio_calc;
+                                        let gpu_layer_ratio = (self.launch_config.n_gpu_layers as f64).min(999.0) / 999.0;
+                                        let gpu_model_gb = model_file_gb as f64 * gpu_layer_ratio;
+                                        let cpu_model_gb = model_file_gb as f64 * (1.0 - gpu_layer_ratio);
+                                        // KV缓存始终在GPU上（由llama-server管理）
                                         let kv_extra_gb = (self.launch_config.ctx_size as f64 * self.launch_config.n_parallel as f64 * 2.0 * 2.0) / (1024.0 * 1024.0 * 1024.0);
-                                        let total_est = est_model_gb + kv_extra_gb;
-                                        let vram_total = self.gpu_vram_total as f64;
-                                        let free_est = (vram_total - total_est).max(0.0);
+                                        let gpu_total_est = gpu_model_gb + kv_extra_gb;
+                                        let cpu_total_est = cpu_model_gb; // CPU部分只有模型权重
 
-                                        // 颜色
-                                        let usage_color = if total_est > vram_total * 0.9 {
-                                            egui::Color32::from_rgb(255, 80, 80)
-                                        } else if total_est > vram_total * 0.7 {
+                                        // === GPU VRAM 条 ===
+                                        // 先收集所有绘制信息，避免painter和ui借用冲突
+                                        let mut gpu_bar_info: Option<(egui::Rect, egui::Color32, f64, f64, f64, f64, f64)> = None;
+                                        let mut ram_bar_info: Option<(egui::Rect, egui::Color32, f64, f64, f64, f64)> = None;
+                                        let mut ram_all_gpu: Option<(egui::Rect, f64)> = None;
+
+                                        if self.gpu_vram_total > 0.0 {
+                                            let vram_total = self.gpu_vram_total as f64;
+                                            let free_vram = (vram_total - gpu_total_est).max(0.0);
+                                            let gpu_usage_color = if gpu_total_est > vram_total * 0.9 {
+                                                egui::Color32::from_rgb(255, 80, 80)
+                                            } else if gpu_total_est > vram_total * 0.7 {
+                                                egui::Color32::from_rgb(255, 200, 50)
+                                            } else {
+                                                egui::Color32::from_rgb(80, 200, 120)
+                                            };
+
+                                            // GPU标签（ui可变操作）
+                                            ui.label(egui::RichText::new(
+                                                format!("🖥️ GPU VRAM: {:.0} GB", vram_total)
+                                            ).size(11.0).color(egui::Color32::from_rgb(100, 180, 255)));
+
+                                            let bar_h = 16.0;
+                                            let (rect, _) = ui.allocate_exact_size(
+                                                egui::vec2(ui.available_width(), bar_h + 16.0),
+                                                egui::Sense::hover(),
+                                            );
+                                            gpu_bar_info = Some((rect, gpu_usage_color, vram_total, gpu_total_est, gpu_model_gb, kv_extra_gb, free_vram));
+                                        }
+
+                                        // === System RAM 条 ===
+                                        if self.sys_ram_total > 0.0 {
+                                            let ram_total = self.sys_ram_total as f64;
+                                            let free_ram = (ram_total - cpu_total_est).max(0.0);
+                                            let ram_usage_color = if cpu_total_est < 0.01 {
+                                                egui::Color32::from_rgb(60, 60, 70)
+                                            } else if cpu_total_est > ram_total * 0.5 {
+                                                egui::Color32::from_rgb(255, 120, 80)
+                                            } else {
+                                                egui::Color32::from_rgb(180, 140, 255)
+                                            };
+
+                                            ui.label(egui::RichText::new(
+                                                format!("💾 RAM: {:.0} GB", ram_total)
+                                            ).size(11.0).color(egui::Color32::from_rgb(180, 140, 255)));
+
+                                            let bar_h = 16.0;
+                                            let (rect, _) = ui.allocate_exact_size(
+                                                egui::vec2(ui.available_width(), bar_h + 16.0),
+                                                egui::Sense::hover(),
+                                            );
+                                            if cpu_total_est > 0.01 {
+                                                ram_bar_info = Some((rect, ram_usage_color, ram_total, cpu_total_est, gpu_layer_ratio, free_ram));
+                                            } else {
+                                                ram_all_gpu = Some((rect, ram_total));
+                                            }
+                                        } else if cpu_total_est > 0.01 {
+                                            ui.label(egui::RichText::new(
+                                                format!("💾 CPU Layers ≈ {:.1} GB ({:.0}% of model)", cpu_total_est, (1.0 - gpu_layer_ratio) * 100.0)
+                                            ).size(11.0).color(egui::Color32::from_rgb(180, 140, 255)));
+                                        }
+
+                                        // === 速度影响估算 ===
+                                        let gpu_ratio_f32 = gpu_layer_ratio as f32;
+                                        let (speed_pct, speed_desc) = Self::estimate_speed_impact(gpu_ratio_f32);
+                                        let speed_color = if speed_pct > 70.0 {
+                                            egui::Color32::from_rgb(80, 220, 120)
+                                        } else if speed_pct > 40.0 {
                                             egui::Color32::from_rgb(255, 200, 50)
                                         } else {
-                                            egui::Color32::from_rgb(80, 200, 120)
+                                            egui::Color32::from_rgb(255, 100, 80)
                                         };
 
-                                        // 进度条式VRAM使用可视化
-                                        let bar_height = 18.0;
-                                        let (rect, _) = ui.allocate_exact_size(
-                                            egui::vec2(ui.available_width(), bar_height + 20.0),
-                                            egui::Sense::hover(),
-                                        );
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("⚡").size(11.0));
+                                            ui.label(egui::RichText::new(
+                                                format!("{}: ~{}% speed ({})",
+                                                    t(lang, "speed_est"),
+                                                    speed_pct as i32,
+                                                    speed_desc
+                                                )
+                                            ).size(11.0).color(speed_color));
+                                        });
+
+                                        // 如果有CPU层，显示额外提示
+                                        if gpu_layer_ratio < 0.99 && gpu_layer_ratio > 0.01 {
+                                            ui.label(egui::RichText::new(
+                                                format!("⚠ {} ≈ {:.0}% → {}",
+                                                    t(lang, "cpu_layers_note"),
+                                                    (1.0 - gpu_layer_ratio) * 100.0,
+                                                    t(lang, "speed_penalty")
+                                                )
+                                            ).size(10.0).color(egui::Color32::from_rgb(255, 180, 100)));
+                                        } else if gpu_layer_ratio <= 0.01 {
+                                            ui.label(egui::RichText::new(
+                                                t(lang, "cpu_only_warning")
+                                            ).size(10.0).color(egui::Color32::from_rgb(255, 80, 80)));
+                                        }
+
+                                        // === 现在获取painter进行绘制 ===
                                         let painter = ui.painter();
 
-                                        // 背景条（总VRAM）
-                                        painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(60, 60, 60));
-                                        // 已用部分
-                                        let usage_ratio = (total_est / vram_total).min(1.0);
-                                        let usage_width = rect.width() * usage_ratio as f32;
-                                        painter.rect_filled(
-                                            egui::Rect::from_min_max(rect.min, egui::pos2(rect.min.x + usage_width, rect.max.y - 15.0)),
-                                            2.0, usage_color,
-                                        );
-                                        // 文字标签
-                                        painter.text(
-                                            rect.min + egui::vec2(4.0, 1.0),
-                                            egui::Align2::LEFT_TOP,
-                                            format!("{:.1} / {:.0} GB ({:.0}%)", total_est, vram_total, usage_ratio * 100.0),
-                                            egui::FontId::proportional(11.0),
-                                            egui::Color32::WHITE,
-                                        );
-                                        // 下方明细
-                                        painter.text(
-                                            egui::pos2(rect.min.x, rect.max.y - 13.0),
-                                            egui::Align2::LEFT_TOP,
-                                            format!("Model: {:.1}GB | KV Cache: {:.1}GB | Free: {:.1}GB", est_model_gb, kv_extra_gb, free_est),
-                                            egui::FontId::proportional(9.0),
-                                            egui::Color32::GRAY,
-                                        );
-                                    } else if model_file_gb > 0.0 {
-                                        // 没检测到VRAM但有模型文件，显示简单估算
-                                        let layer_ratio_calc = (self.launch_config.n_gpu_layers as f64).min(999.0) / 999.0;
-                                        let est_model_gb = model_file_gb as f64 * layer_ratio_calc;
-                                        let kv_extra_gb = (self.launch_config.ctx_size as f64 * self.launch_config.n_parallel as f64 * 2.0 * 2.0) / (1024.0 * 1024.0 * 1024.0);
-                                        let total_est = est_model_gb + kv_extra_gb;
-                                        let color = if total_est > 8.0 { egui::Color32::from_rgb(255, 120, 120) }
-                                                    else if total_est > 6.0 { egui::Color32::YELLOW }
-                                                    else { egui::Color32::from_rgb(120, 255, 120) };
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new(format!("{} ≈ {:.1} GB", t(lang, "est_vram"), total_est)).size(12.0).color(color));
-                                            ui.label(egui::RichText::new(format!("(model {:.1}GB × {:.0}% + KV {:.1}GB)", model_file_gb, layer_ratio_calc * 100.0, kv_extra_gb)).size(9.0).color(egui::Color32::GRAY));
-                                        });
+                                        if let Some((rect, gpu_usage_color, vram_total, gpu_total_est_v, gpu_model_gb, kv_extra_gb, free_vram)) = gpu_bar_info {
+                                            painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(40, 40, 50));
+                                            let gpu_ratio = (gpu_total_est_v / vram_total).min(1.0);
+                                            painter.rect_filled(
+                                                egui::Rect::from_min_max(rect.min, egui::pos2(rect.min.x + rect.width() * gpu_ratio as f32, rect.max.y - 14.0)),
+                                                2.0, gpu_usage_color,
+                                            );
+                                            painter.text(rect.min + egui::vec2(4.0, 1.0), egui::Align2::LEFT_TOP,
+                                                format!("{:.1} / {:.0} GB ({:.0}%)", gpu_total_est_v, vram_total, gpu_ratio * 100.0),
+                                                egui::FontId::proportional(10.0), egui::Color32::WHITE);
+                                            painter.text(
+                                                egui::pos2(rect.min.x, rect.max.y - 12.0), egui::Align2::LEFT_TOP,
+                                                format!("GPU Layers: {:.1}GB model + {:.1}GB KV | Free: {:.1}GB", gpu_model_gb, kv_extra_gb, free_vram),
+                                                egui::FontId::proportional(8.0), egui::Color32::GRAY);
+                                        }
+
+                                        if let Some((rect, ram_usage_color, ram_total, cpu_total_est_v, gpu_lr, free_ram)) = ram_bar_info {
+                                            painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(40, 40, 50));
+                                            let ram_ratio = (cpu_total_est_v / ram_total).min(1.0);
+                                            painter.rect_filled(
+                                                egui::Rect::from_min_max(rect.min, egui::pos2(rect.min.x + rect.width() * ram_ratio as f32, rect.max.y - 14.0)),
+                                                2.0, ram_usage_color,
+                                            );
+                                            painter.text(rect.min + egui::vec2(4.0, 1.0), egui::Align2::LEFT_TOP,
+                                                format!("{:.1} / {:.0} GB ({:.0}%)", cpu_total_est_v, ram_total, (cpu_total_est_v / ram_total * 100.0).min(100.0)),
+                                                egui::FontId::proportional(10.0), egui::Color32::WHITE);
+                                            painter.text(
+                                                egui::pos2(rect.min.x, rect.max.y - 12.0), egui::Align2::LEFT_TOP,
+                                                format!("CPU Layers: {:.1}GB ({:.0}% of model) | Free: {:.1}GB", cpu_total_est_v, (1.0 - gpu_lr) * 100.0, free_ram),
+                                                egui::FontId::proportional(8.0), egui::Color32::GRAY);
+                                        }
+
+                                        if let Some((rect, ram_total)) = ram_all_gpu {
+                                            painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(40, 40, 50));
+                                            painter.text(rect.min + egui::vec2(4.0, 2.0), egui::Align2::LEFT_TOP,
+                                                format!("0.0 / {:.0} GB — All layers on GPU ✓", ram_total),
+                                                egui::FontId::proportional(10.0), egui::Color32::from_rgb(80, 200, 120));
+                                        }
+                                    } else if self.gpu_vram_total > 0.0 {
+                                        // 有VRAM检测但没有模型文件
+                                        ui.label(egui::RichText::new(
+                                            format!("🖥️ GPU: {:.0} GB | 💾 RAM: {:.0} GB",
+                                                self.gpu_vram_total,
+                                                if self.sys_ram_total > 0.0 { self.sys_ram_total } else { 0.0 })
+                                        ).size(11.0).color(egui::Color32::GRAY));
                                     }
                                     ui.horizontal(|ui| {
                                         ui.label(t(lang, "ctx_size"));
